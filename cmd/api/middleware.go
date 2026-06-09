@@ -51,7 +51,14 @@ func (app *application) requiredAuthentication(next http.HandlerFunc) http.Handl
 		}
 		UserId := int(userIDFloat)
 
+		role, ok := claims["role"].(string)
+		if !ok {
+			http.Error(w, "invalid role in token", http.StatusUnauthorized)
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), userContextKey, UserId)
+		ctx = context.WithValue(ctx, roleContextKey, role)
 
 		r = r.WithContext(ctx)
 

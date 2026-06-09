@@ -75,7 +75,6 @@ func (app *application) registerUserHandle(w http.ResponseWriter, r *http.Reques
 
 	if err != nil {
 		http.Error(w, "Bad Request: Invalid Json", http.StatusBadRequest)
-		fmt.Println(err)
 		return
 	}
 
@@ -561,6 +560,7 @@ func (app *application) resetPassword(w http.ResponseWriter, r *http.Request) {
 func (app *application) googleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w,"Method Not Allowed",http.StatusMethodNotAllowed)
+		return
 	}
 
 	var input GoogleLoginRequest
