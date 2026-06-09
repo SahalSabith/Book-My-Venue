@@ -150,6 +150,26 @@ export const googleLogin = createAsyncThunk(
   }
 );
 
+export const registerVenueOwner = createAsyncThunk(
+  "auth/registerVenueOwner",
+  async (reqData, { rejectWithValue,getState }) => {
+    try {
+      const token = getState().auth.token;
+
+      const response = await axios.post(
+        "http://localhost:4000/register-venue-owner",reqData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 
 const initialState = {
   user: null,
@@ -237,6 +257,12 @@ const authSlice = createSlice({
         localStorage.setItem("token",action.payload.token);
       })
 
+      .addCase(registerVenueOwner.fulfilled, (state) => {
+        state.loading = false;
+        state.token = action.payload.token;
+        localStorage.setItem("token",action.payload.token);
+      })
+      
 
       // ALL PENDING REQUESTS
       .addMatcher(
@@ -248,7 +274,8 @@ const authSlice = createSlice({
           forgotPassword,
           verifyForgotPassword,
           changePassword,
-          googleLogin
+          googleLogin,
+          registerVenueOwner
         ),
         (state) => {
           state.loading = true;
@@ -267,7 +294,8 @@ const authSlice = createSlice({
           forgotPassword,
           verifyForgotPassword,
           changePassword,
-          googleLogin
+          googleLogin,
+          registerVenueOwner
         ),
         (state, action) => {
           state.loading = false;

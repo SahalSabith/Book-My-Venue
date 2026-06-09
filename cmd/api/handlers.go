@@ -2,80 +2,25 @@ package main
 
 import (
 	"BookMyVenue/internal/models"
-	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"net/http"
-	"net/smtp"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
-
 	"cloud.google.com/go/auth/credentials/idtoken"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
-
-func GenerateSecureOTP(length int) (string,error) {
-	const digits = "0123456789"
-	result := make([]byte, length)
-	for i := 0; i < length; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(digits))))
-		if err != nil {
-			return "", err
-		}
-		result[i] = digits[num.Int64()]
-	}
-	return string(result), nil
-}
-
 type GoogleLoginRequest struct {
 	IDToken string `json:"id_token"`
 }
 
-type Validator struct {
-	Errors map[string]string
-}
-
-func NewValidator() *Validator{
-	return &Validator{
-		Errors: make(map[string]string),
-	}
-}
-
-func (v *Validator) AddError(field, message string) {
-	v.Errors[field] = message
-}
-
-func (v *Validator) Valid() bool {
-	return len(v.Errors) == 0
-}
-
-func validPassword(password string) bool {
-	if len(password) < 8 {
-		return false
-	}
-	hasNumber := false
-	hasSpecial := false
-
-	for _, char := range password {
-		switch {
-		case unicode.IsNumber(char):
-			hasNumber = true
-		case unicode.IsPunct(char) || unicode.IsSymbol(char):
-			hasSpecial = true
-		}
-	}
-	return hasNumber && hasSpecial
-}
 
 func (app *application) registerUserHandle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -268,7 +213,7 @@ func (app *application) loginUserHandle(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash),[]byte(input.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String),[]byte(input.Password))
 	if err != nil {
 		http.Error(w, "invalid Credentials", http.StatusUnauthorized)
 		return
@@ -276,6 +221,7 @@ func (app *application) loginUserHandle(w http.ResponseWriter, r *http.Request) 
 
 	claims := jwt.MapClaims{
 		"sub":user.ID,
+		"role":user.Role,
 		"exp":time.Now().Add(24 * time.Hour).Unix(),
 		"iat":time.Now().Unix(),
 	}
@@ -332,6 +278,7 @@ func (app *application) verifyOtp(w http.ResponseWriter, r *http.Request) {
 
 	claims := jwt.MapClaims{
 		"sub":newId,
+		"role":"user",
 		"exp":time.Now().Add(24 * time.Hour).Unix(),
 		"iat":time.Now().Unix(),
 	}
@@ -652,11 +599,13 @@ func (app *application) googleAuthHandler(w http.ResponseWriter, r *http.Request
 	fmt.Printf("SUCCESS: Verified Google user %s (%s)\n", name, email)
 
 	var userId int
+	role := "user"
 
 	user, err := app.users.GetByEmail(email)
 
 	if err != nil && err.Error() != "User not Found" {
-		http.Error(w,"Database Error",http.StatusInternalServerError)
+		http.Error(w,err.Error(),http.StatusInternalServerError)
+		return
 	}
 
 	if user == nil {
@@ -667,11 +616,13 @@ func (app *application) googleAuthHandler(w http.ResponseWriter, r *http.Request
 		}
 	} else {
 		userId = user.ID
+		role = user.Role
 	}
 
 
 	claims := jwt.MapClaims{
 		"sub":userId,
+		"role":role,
 		"exp":time.Now().Add(24 * time.Hour).Unix(),
 		"iat":time.Now().Unix(),
 	}
@@ -700,11 +651,11 @@ func (app *application) registerVenueOwner(w http.ResponseWriter, r *http.Reques
 	}
 
 	var input struct {
-		BusinessName string
-		BusinessEmail string
-		BusinessPhone int64
+		BusinessName string `json:"business_name"`
+		BusinessEmail string `json:"business_email"`
+		BusinessPhone int64 `json:"business_phone"`
 		UserID int
-		TermsAndCondition bool
+		TermsAndCondition bool `json:"terms_and_condition"`
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
@@ -756,7 +707,7 @@ func (app *application) registerVenueOwner(w http.ResponseWriter, r *http.Reques
 
 	err = app.venueOwners.Insert(input.BusinessName,input.BusinessEmail,userID,input.BusinessPhone,input.TermsAndCondition)
 	if err != nil {
-		http.Error(w, "Error while Creating Venue Owner account",http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -766,80 +717,27 @@ func (app *application) registerVenueOwner(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	claims := jwt.MapClaims{
+		"sub":userID,
+		"role":"owner",
+		"exp":time.Now().Add(24 * time.Hour).Unix(),
+		"iat":time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(app.jwtSecureKey)
+	if err != nil {
+		http.Error(w, "Could Not Generate Token", http.StatusInternalServerError)
+		return
+	}
+
 	response := map[string]string{
 		"message":"Venue Owner Created Succesfully",
+		"token":tokenString,
 	}
 
 	w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
-}
-
-
-func (app *application) sendOTPEmail(targetEmail, otpCode string) {
-	go func() {
-		err := godotenv.Load()
-
-		if err != nil {
-			log.Fatal("Error loading .env")
-		}
-
-		smtpHost := os.Getenv("SMTP_HOST")
-		smtpPort := os.Getenv("SMTP_PORT")
-		smtpUsername := os.Getenv("SMTP_USERNAME")
-		smtpPassword := os.Getenv("SMTP_PASSWORD")
-
-		subject := "Subject: Your Venue Booking Verification Code\r\n"
-		mimeHeaders := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\r\n"
-		
-		body := fmt.Sprintf(`
-			<html>
-				<body>
-					<h2>Verify Your Account</h2>
-					<p>Your one-time verification code is: <strong>%s</strong></p>
-					<p>This code will expire in exactly 1 minutes.</p>
-				</body>
-			</html>
-		`, otpCode)
-
-		message := []byte(subject + mimeHeaders + "\r\n" + body)
-
-		auth := smtp.PlainAuth("",smtpUsername,smtpPassword,smtpHost)
-
-		address := fmt.Sprintf("%s:%s",smtpHost,smtpPort)
-		err = smtp.SendMail(address,auth,smtpUsername,[]string{targetEmail},message)
-		if err != nil {
-			fmt.Printf("BACKGROUND ERROR: Failed to send OTP to %s: %v\n", targetEmail, err)
-			return
-		}
-		fmt.Printf("BACKGROUND SUCCESS: OTP dispatched to %s\n", targetEmail)
-	}()
-}
-
-var ErrRateLimitExceeded = errors.New("rate limit exceeded")
-
-func (app *application) enforceRateLimit(ctx context.Context, key string, maxRequest int64, window time.Duration) error {
-	count, err := app.regCache.Redis.Incr(ctx, key).Result()
-	if err != nil {
-		return err
-	}
-
-	if count ==1 {
-		app.regCache.Redis.Expire(ctx, key, window)
-	}
-
-	if count > maxRequest {
-		return ErrRateLimitExceeded
-	}
-
-	return nil
-}
-
-func getIPAddress(r *http.Request) string {
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		return forwarded
-	}
-
-	return r.RemoteAddr
 }

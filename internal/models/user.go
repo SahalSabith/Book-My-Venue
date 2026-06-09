@@ -11,8 +11,9 @@ type User struct {
 	Name string `json:"name"`
 	Email string `json:"email"`
 	AuthProvider string `jso:"auth_provider"`
-	PhoneNo int64 `json:"phone_number"`
-	PasswordHash string `json:"-"`
+	PhoneNo sql.NullInt64 `json:"phone_number"`
+	Role string `json:"role"`
+	PasswordHash sql.NullString `json:"-"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -60,7 +61,7 @@ func (m *UserModel) Insert(name,email,authProvider string,hashedPassword *string
 
 func (m *VenueOwnerModel) Insert(businessName, businessEmail string, userId int, businessPhone int64, termsAndCondition bool) error {
 	stmt := `
-		INSERT INTO users (businessName, businessEmail, userId, businessPhone, termsAndCondition)
+		INSERT INTO venue_owners (business_name, business_email, user_id, business_phone, terms_and_condition)
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
@@ -83,6 +84,7 @@ func (m *UserModel) GetByEmail(email string) (*User, error) {
 		auth_provider,
 		phone_number,
 		password_hash,
+		role,
 		created_at
 	FROM users WHERE email = $1
 	`
@@ -97,6 +99,7 @@ func (m *UserModel) GetByEmail(email string) (*User, error) {
 		&user.AuthProvider,
 		&user.PhoneNo,
 		&user.PasswordHash,
+		&user.Role,
 		&user.CreatedAt,
 	)
 
@@ -118,6 +121,7 @@ func (m *UserModel) GetByPhoneNo(phoneNo int64) (*User, error) {
 		email,
 		auth_provider,
 		phone_number,
+		role,
 		password_hash,
 		created_at
 	FROM users WHERE phone_number = $1
@@ -132,6 +136,7 @@ func (m *UserModel) GetByPhoneNo(phoneNo int64) (*User, error) {
 		&user.Email,
 		&user.AuthProvider,
 		&user.PhoneNo,
+		&user.Role,
 		&user.PasswordHash,
 		&user.CreatedAt,
 	)
@@ -169,7 +174,7 @@ func (m *UserModel) UpdatePassword(newPassword,email string) (error) {
 
 func (m *UserModel) UpdateRole(userId int) (error) {
 	stmt := `
-	UPDATE users SET role = "owner" WHERE id = $1
+	UPDATE users SET role = 'owner' WHERE id = $1
 	`
 
 	result, err := m.DB.Exec(stmt,userId)
