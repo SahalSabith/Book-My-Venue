@@ -16,6 +16,18 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type VenueOwner struct {
+	UserID int `josn:"user_id"`
+	BusinessName string `josn:"business_name"`
+	BusinessEmail string `josn:"business_email"`
+	BusinessPhone int64 `josn:"business_phone"`
+	TermsAndCondition bool `josn:"terms_and_condition"`
+}
+
+type VenueOwnerModel struct {
+	DB *sql.DB
+}
+
 type UserModel struct {
 	DB *sql.DB
 }
@@ -46,7 +58,21 @@ func (m *UserModel) Insert(name,email,authProvider string,hashedPassword *string
 	return id, nil
 }
 
+func (m *VenueOwnerModel) Insert(businessName, businessEmail string, userId int, businessPhone int64, termsAndCondition bool) error {
+	stmt := `
+		INSERT INTO users (businessName, businessEmail, userId, businessPhone, termsAndCondition)
+		VALUES ($1, $2, $3, $4, $5)
+	`
 
+	_,err := m.DB.Exec(stmt, businessName, businessEmail, userId, businessPhone ,termsAndCondition)
+	if err != nil{
+		if err.Error() == `pq: duplicate key value violates unique constraint "venue_owners_business_email_key"` {
+			return errors.New("a business with this email already exists")
+		}
+		return err
+	}
+	return nil
+}
 
 func (m *UserModel) GetByEmail(email string) (*User, error) {
 	stmt := `
@@ -125,6 +151,28 @@ func (m *UserModel) UpdatePassword(newPassword,email string) (error) {
 	`
 
 	result, err := m.DB.Exec(stmt,newPassword,email)
+	if err != nil {
+		return err
+	}
+
+	rows,err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return errors.New("users not found")
+	}
+
+	return nil
+}
+
+func (m *UserModel) UpdateRole(userId int) (error) {
+	stmt := `
+	UPDATE users SET role = "owner" WHERE id = $1
+	`
+
+	result, err := m.DB.Exec(stmt,userId)
 	if err != nil {
 		return err
 	}

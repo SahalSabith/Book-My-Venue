@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, isPending, isRejected } from "@reduxjs/toolkit";
 import axios from "axios";
 
 
@@ -151,133 +151,134 @@ export const googleLogin = createAsyncThunk(
 );
 
 
+const initialState = {
+  user: null,
+  resetToken: null,
+  token: localStorage.getItem("token"),
+  loading: false,
+  error: null,
+};
+
 const authSlice = createSlice({
   name: "auth",
-  initialState: {
-    user: null,
-    resetToken:null,
-    token: null,
-    loading: false,
-    error: null
-  },
+
+  initialState,
+
   reducers: {
     logout: (state) => {
       state.user = null;
       state.token = null;
-    }
+      state.resetToken = null;
+      state.error = null;
+      state.loading = false;
+      localStorage.removeItem("token");
+    },
   },
+
+
   extraReducers: (builder) => {
     builder
+
       // REGISTER
-      .addCase(registerUser.pending, (state) => {
-        state.loading = true;
-      })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-      })
-      .addCase(registerUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
       })
 
 
       // LOGIN
-      .addCase(loginUser.pending, (state) => {
-        state.loading = true;
-      })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
-      })
-      .addCase(loginUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
+        localStorage.setItem("token",action.payload.token);
       })
 
 
-      .addCase(verifyOTP.pending, (state) => {
-        state.loading = true;
-      })
+      // VERIFY OTP
       .addCase(verifyOTP.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
-      })
-      .addCase(verifyOTP.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
+        localStorage.setItem("token",action.payload.token);
       })
 
 
-      .addCase(resendOTP.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(resendOTP.fulfilled, (state, action) => {
+      // RESEND OTP
+      .addCase(resendOTP.fulfilled, (state) => {
         state.loading = false;
-      })
-      .addCase(resendOTP.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
-      
-      .addCase(forgotPassword.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(forgotPassword.fulfilled, (state, action) => {
-        state.loading = false;
-      })
-      .addCase(forgotPassword.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
       })
 
 
-      .addCase(verifyForgotPassword.pending, (state) => {
-        state.loading = true;
+      // FORGOT PASSWORD
+      .addCase(forgotPassword.fulfilled, (state) => {
+        state.loading = false;
       })
+
+
+      // VERIFY FORGOT PASSWORD OTP
       .addCase(verifyForgotPassword.fulfilled, (state, action) => {
         state.loading = false;
-        state.resetToken = action.payload.resetToken
+        state.resetToken = action.payload.resetToken;
       })
-      .addCase(verifyForgotPassword.rejected, (state, action) => {
+
+
+      // CHANGE PASSWORD
+      .addCase(changePassword.fulfilled, (state) => {
         state.loading = false;
-        state.error = action.payload;
+        state.resetToken = null;
       })
 
 
-      .addCase(changePassword.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(changePassword.fulfilled, (state, action) => {
-        state.loading = false;
-      })
-      .addCase(changePassword.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
-
-      .addCase(googleLogin.pending, (state) => {
-        state.loading = true;
-      })
+      // GOOGLE LOGIN
       .addCase(googleLogin.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        localStorage.setItem("token",action.payload.token);
       })
-      .addCase(googleLogin.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      });
-  }
+
+
+      // ALL PENDING REQUESTS
+      .addMatcher(
+        isPending(
+          registerUser,
+          loginUser,
+          verifyOTP,
+          resendOTP,
+          forgotPassword,
+          verifyForgotPassword,
+          changePassword,
+          googleLogin
+        ),
+        (state) => {
+          state.loading = true;
+          state.error = null;
+        }
+      )
+
+
+      // ALL FAILED REQUESTS
+      .addMatcher(
+        isRejected(
+          registerUser,
+          loginUser,
+          verifyOTP,
+          resendOTP,
+          forgotPassword,
+          verifyForgotPassword,
+          changePassword,
+          googleLogin
+        ),
+        (state, action) => {
+          state.loading = false;
+          state.error =
+            action.payload || "Something went wrong";
+        }
+      );
+  },
 });
 
 
 export const { logout } = authSlice.actions;
-
 
 export default authSlice.reducer;

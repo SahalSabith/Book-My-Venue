@@ -12,6 +12,7 @@ import (
 
 type application struct {
 	users *models.UserModel
+	venueOwners *models.VenueOwnerModel
 	jwtSecureKey []byte
 	regCache *models.RegistrationCache
 	forgotCache *models.ForgotPasswordCache
@@ -46,6 +47,7 @@ func main() {
 
 	app := &application{
 		users: &models.UserModel{DB: db},
+		venueOwners: &models.VenueOwnerModel{DB: db},
 		jwtSecureKey: []byte(secretKey),
 		regCache: &models.RegistrationCache{Redis: redisClient},
 		forgotCache: &models.ForgotPasswordCache{Redis: redisClient},
@@ -65,6 +67,7 @@ func main() {
 	mux.HandleFunc("/verify-forgotpassowrd-otp",app.verifyForgotPassOtp)
 	mux.HandleFunc("/change-passowrd",app.resetPassword)
 	mux.HandleFunc("/google",app.googleAuthHandler)
+	mux.HandleFunc("/register-venue-owner",app.requiredAuthentication(app.registerVenueOwner))
 
 	// app.requiredAuthentication
 

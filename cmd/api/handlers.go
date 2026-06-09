@@ -693,6 +693,88 @@ func (app *application) googleAuthHandler(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(response)
 }
 
+func (app *application) registerVenueOwner(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed",http.StatusMethodNotAllowed)
+		return
+	}
+
+	var input struct {
+		BusinessName string
+		BusinessEmail string
+		BusinessPhone int64
+		UserID int
+		TermsAndCondition bool
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	err := decoder.Decode(&input)
+
+	validator := NewValidator()
+	
+	if strings.TrimSpace(input.BusinessName) =="" {
+		validator.AddError("business_Name","Name is required")
+	}
+
+	if strings.TrimSpace(input.BusinessEmail) =="" {
+		validator.AddError("Email","Email is required")
+	} else if !strings.HasSuffix(strings.ToLower(input.BusinessEmail),"@gmail.com") {
+		validator.AddError("Email","Invalid email")
+	}
+
+	if input.BusinessPhone == 0 {
+		validator.AddError("PhoneNo","PhoneNo is required")
+	} else if len(strconv.FormatInt(input.BusinessPhone, 10)) != 10 {
+		validator.AddError("PhoneNo","Phone number must be 10 digits")
+	}
+
+	if !input.TermsAndCondition {
+		validator.AddError("terms_and_condition","terms and condition shold be checked")
+	}
+
+
+	if err != nil {
+		http.Error(w, "Bad Request: Invalid Json", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	if !validator.Valid() {
+		w.Header().Set("Content-Type","application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":validator.Errors,
+		})
+		return
+	}
+
+	userID := r.Context().Value(userContextKey).(int)
+
+	err = app.venueOwners.Insert(input.BusinessName,input.BusinessEmail,userID,input.BusinessPhone,input.TermsAndCondition)
+	if err != nil {
+		http.Error(w, "Error while Creating Venue Owner account",http.StatusInternalServerError)
+		return
+	}
+
+	err = app.users.UpdateRole(userID)
+	if err != nil {
+		http.Error(w, "Error while Creating Venue Owner account",http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]string{
+		"message":"Venue Owner Created Succesfully",
+	}
+
+	w.Header().Set("Content-Type","application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
 
 func (app *application) sendOTPEmail(targetEmail, otpCode string) {
 	go func() {
