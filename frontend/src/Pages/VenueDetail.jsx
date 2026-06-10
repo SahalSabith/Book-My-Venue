@@ -1,99 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
-
-// ── Sidebar (same as other pages) ───────────────────────────────────────────
-const NAV_ITEMS = [
-  {
-    key: "overview", label: "Overview", href: "/venue-owner",
-    icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>),
-  },
-  {
-    key: "venues", label: "My Venues", href: "/venue-owner/venues",
-    icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>),
-  },
-  {
-    key: "bookings", label: "Bookings", href: "/venue-owner/bookings",
-    icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>),
-  },
-  {
-    key: "earnings", label: "Earnings", href: "/venue-owner/earnings",
-    icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>),
-  },
-  {
-    key: "settings", label: "Settings", href: "/venue-owner/settings",
-    icon: (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" /></svg>),
-  },
-];
-
-function Sidebar() {
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const isActive = (href) =>
-    href === "/venue-owner" ? location.pathname === "/venue-owner" : location.pathname.startsWith(href);
-
-  return (
-    <>
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 h-14 flex items-center px-4 justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-gray-900 rounded-md flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 12 12">
-              <rect x="1" y="1" width="4" height="4" fill="white" />
-              <rect x="7" y="1" width="4" height="4" fill="white" opacity=".6" />
-              <rect x="1" y="7" width="4" height="4" fill="white" opacity=".6" />
-              <rect x="7" y="7" width="4" height="4" fill="white" opacity=".3" />
-            </svg>
-          </div>
-          <span className="font-bold text-sm text-gray-900">BookMyVenue</span>
-        </Link>
-        <button onClick={() => setMobileOpen((o) => !o)} className="flex flex-col gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Toggle sidebar">
-          <span className={`block w-5 h-0.5 bg-gray-700 transition-all duration-200 ${mobileOpen ? "rotate-45 translate-y-2" : ""}`} />
-          <span className={`block w-5 h-0.5 bg-gray-700 transition-all duration-200 ${mobileOpen ? "opacity-0" : ""}`} />
-          <span className={`block w-5 h-0.5 bg-gray-700 transition-all duration-200 ${mobileOpen ? "-rotate-45 -translate-y-2" : ""}`} />
-        </button>
-      </div>
-      {mobileOpen && <div className="lg:hidden fixed inset-0 z-30 bg-black/30" onClick={() => setMobileOpen(false)} />}
-      <aside className={`fixed top-0 left-0 z-40 h-full w-64 bg-white border-r border-gray-100 flex flex-col transition-transform duration-300 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="h-16 flex items-center px-6 border-b border-gray-100 shrink-0">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 12 12">
-                <rect x="1" y="1" width="4" height="4" fill="white" />
-                <rect x="7" y="1" width="4" height="4" fill="white" opacity=".6" />
-                <rect x="1" y="7" width="4" height="4" fill="white" opacity=".6" />
-                <rect x="7" y="7" width="4" height="4" fill="white" opacity=".3" />
-              </svg>
-            </div>
-            <span className="font-bold text-gray-900">BookMyVenue</span>
-          </Link>
-        </div>
-        <div className="px-6 pt-5 pb-2">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Owner Portal</p>
-        </div>
-        <nav className="flex-1 px-3 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <Link key={item.key} to={item.href} onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 text-sm font-medium transition-colors ${isActive(item.href) ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"}`}>
-              <span className="shrink-0">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-gray-100 flex flex-col gap-2">
-          <Link to="/" className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-            Back to marketplace
-          </Link>
-          <button className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            Sign out
-          </button>
-        </div>
-      </aside>
-    </>
-  );
-}
+import { useSelector, useDispatch } from "react-redux";
+import { venueDetail, updateVenue } from "../Redux/Slice/venueSlice";
+import VenueOwnerSidebar from "../Components/VenueOwnerSidebar";
 
 // ── Detail row ───────────────────────────────────────────────────────────────
 function DetailRow({ icon, label, value }) {
@@ -125,63 +34,438 @@ function StatPill({ label, value, accent }) {
   );
 }
 
-// ── Mock booking data for the venue ─────────────────────────────────────────
+// ── Field component ──────────────────────────────────────────────────────────
+function Field({ label, error, required, hint, children }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        {label}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
+      </label>
+      {children}
+      {hint && !error && <p className="text-[11px] text-gray-400">{hint}</p>}
+      {error && (
+        <p className="text-[11px] text-red-500 flex items-center gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const inputCls = (hasError) =>
+  `w-full px-3 py-2.5 rounded-xl border text-sm text-gray-900 placeholder-gray-300 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
+    hasError
+      ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100"
+      : "border-gray-200 bg-white focus:border-gray-400 focus:ring-gray-100"
+  }`;
+
+// ── Edit Drawer ──────────────────────────────────────────────────────────────
+const FIELDS = [
+  { key: "name",           label: "Venue Name",         type: "text",     required: true,  placeholder: "e.g. The Grand Ballroom" },
+  { key: "description",   label: "Description",         type: "textarea", required: true,  placeholder: "Describe the venue, amenities, and what makes it unique…" },
+  { key: "address_line",  label: "Address",             type: "text",     required: true,  placeholder: "Street address or landmark" },
+  { key: "city",          label: "City",                type: "text",     required: true,  placeholder: "e.g. Kochi" },
+  { key: "district",      label: "District",            type: "text",     required: true,  placeholder: "e.g. Ernakulam" },
+  { key: "state",         label: "State",               type: "text",     required: true,  placeholder: "e.g. Kerala" },
+  { key: "max_capacity",  label: "Max Capacity",        type: "number",   required: true,  placeholder: "e.g. 300", hint: "Maximum number of guests allowed." },
+  { key: "price_per_hour", label: "Price per Hour (₹)", type: "number",   required: true,  placeholder: "e.g. 8000" },
+  { key: "price_per_day",  label: "Price per Day (₹)",  type: "number",   required: true,  placeholder: "e.g. 55000" },
+];
+
+function validate(form) {
+  const e = {};
+  if (!form.name?.trim())         e.name         = "Venue name is required";
+  if (!form.description?.trim())  e.description  = "Description is required";
+  if (!form.address_line?.trim()) e.address_line = "Address is required";
+  if (!form.city?.trim())         e.city         = "City is required";
+  if (!form.district?.trim())     e.district     = "District is required";
+  if (!form.state?.trim())        e.state        = "State is required";
+  if (!form.max_capacity || isNaN(form.max_capacity) || Number(form.max_capacity) < 1)
+    e.max_capacity = "Enter a valid capacity (≥ 1)";
+  if (!form.price_per_hour || isNaN(form.price_per_hour) || Number(form.price_per_hour) < 1)
+    e.price_per_hour = "Enter a valid hourly rate";
+  if (!form.price_per_day || isNaN(form.price_per_day) || Number(form.price_per_day) < 1)
+    e.price_per_day = "Enter a valid daily rate";
+  return e;
+}
+
+function EditDrawer({ venue, open, onClose, onSave, saving }) {
+  const [form, setForm]       = useState({});
+  const [errors, setErrors]   = useState({});
+  const [touched, setTouched] = useState({});
+  const drawerRef = useRef(null);
+
+  // Initialise form when venue or open changes
+  useEffect(() => {
+    if (venue && open) {
+      const initial = {};
+      FIELDS.forEach(({ key }) => { initial[key] = String(venue[key] ?? ""); });
+      setForm(initial);
+      setErrors({});
+      setTouched({});
+    }
+  }, [venue, open]);
+
+  // Re-validate only touched fields on every form change
+  useEffect(() => {
+    if (!open || Object.keys(touched).length === 0) return;
+    const allErrors = validate(form);
+    const visibleErrors = Object.fromEntries(
+      Object.entries(allErrors).filter(([k]) => touched[k])
+    );
+    setErrors(visibleErrors);
+  }, [form, touched, open]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape" && open) onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  const handleChange = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleBlur = (key) => {
+    setTouched((prev) => ({ ...prev, [key]: true }));
+  };
+
+  // Compute changed fields: only keys whose trimmed value differs from the original
+  const getChangedFields = () => {
+    const changed = {};
+    FIELDS.forEach(({ key, type }) => {
+      const original = String(venue[key] ?? "").trim();
+      const current  = (form[key] ?? "").trim();
+      // Only include if actually different — empty strings are a valid change
+      if (current !== original) {
+        changed[key] = type === "number" ? Number(current) : current;
+      }
+    });
+    return changed;
+  };
+
+  const changedFields  = venue ? getChangedFields() : {};
+  const changedCount   = Object.keys(changedFields).length;
+  const hasChanges     = changedCount > 0;
+
+  const handleSubmit = () => {
+    // Touch everything to reveal all errors
+    const allTouched = {};
+    FIELDS.forEach(({ key }) => { allTouched[key] = true; });
+    setTouched(allTouched);
+
+    const allErrors = validate(form);
+    if (Object.keys(allErrors).length > 0) {
+      setErrors(allErrors);
+      return;
+    }
+
+    if (!hasChanges) { onClose(); return; }
+
+    onSave(changedFields);
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        onClick={onClose}
+      />
+
+      {/* Drawer panel */}
+      <aside
+        ref={drawerRef}
+        className={`fixed top-0 right-0 z-50 h-full w-full max-w-lg bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}
+        aria-label="Edit venue"
+        role="dialog"
+        aria-modal="true"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Edit Venue</h2>
+            <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[220px]">{venue?.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasChanges && (
+              <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                {changedCount} unsaved change{changedCount !== 1 ? "s" : ""}
+              </span>
+            )}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              aria-label="Close"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex flex-col gap-5">
+
+            {/* Section: Basic info */}
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Basic Info</p>
+              <div className="flex flex-col gap-4">
+                {["name", "description"].map((key) => {
+                  const f = FIELDS.find((x) => x.key === key);
+                  return (
+                    <Field key={key} label={f.label} error={errors[key]} required={f.required} hint={f.hint}>
+                      {f.type === "textarea" ? (
+                        <textarea
+                          rows={4}
+                          value={form[key] ?? ""}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key)}
+                          placeholder={f.placeholder}
+                          className={`${inputCls(!!errors[key])} resize-none`}
+                        />
+                      ) : (
+                        <input
+                          type={f.type}
+                          value={form[key] ?? ""}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key)}
+                          placeholder={f.placeholder}
+                          className={inputCls(!!errors[key])}
+                        />
+                      )}
+                    </Field>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section: Location */}
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Location</p>
+              <div className="flex flex-col gap-4">
+                {["address_line", "city", "district", "state"].map((key) => {
+                  const f = FIELDS.find((x) => x.key === key);
+                  return (
+                    <Field key={key} label={f.label} error={errors[key]} required={f.required}>
+                      <input
+                        type="text"
+                        value={form[key] ?? ""}
+                        onChange={(e) => handleChange(key, e.target.value)}
+                        onBlur={() => handleBlur(key)}
+                        placeholder={f.placeholder}
+                        className={inputCls(!!errors[key])}
+                      />
+                    </Field>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section: Pricing & capacity */}
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Pricing & Capacity</p>
+              <div className="grid grid-cols-2 gap-4">
+                {["price_per_hour", "price_per_day"].map((key) => {
+                  const f = FIELDS.find((x) => x.key === key);
+                  return (
+                    <Field key={key} label={f.label} error={errors[key]} required={f.required}>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form[key] ?? ""}
+                          onChange={(e) => handleChange(key, e.target.value)}
+                          onBlur={() => handleBlur(key)}
+                          placeholder={f.placeholder?.replace("e.g. ", "")}
+                          className={`${inputCls(!!errors[key])} pl-7`}
+                        />
+                      </div>
+                    </Field>
+                  );
+                })}
+              </div>
+              <div className="mt-4">
+                {(() => {
+                  const f = FIELDS.find((x) => x.key === "max_capacity");
+                  return (
+                    <Field label={f.label} error={errors.max_capacity} required hint={f.hint}>
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.max_capacity ?? ""}
+                        onChange={(e) => handleChange("max_capacity", e.target.value)}
+                        onBlur={() => handleBlur("max_capacity")}
+                        placeholder="e.g. 300"
+                        className={inputCls(!!errors.max_capacity)}
+                      />
+                    </Field>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Changed fields summary */}
+            {hasChanges && (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+                <p className="text-xs font-semibold text-amber-700 mb-1.5">Fields being updated</p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {Object.keys(changedFields).map((k) => (
+                    <li key={k} className="text-[11px] font-medium bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded-full capitalize">
+                      {k.replace(/_/g, " ")}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 shrink-0 flex items-center gap-3 bg-white">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || !hasChanges}
+            className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
+              saving || !hasChanges
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-gray-900 text-white hover:bg-gray-700 active:scale-[0.98]"
+            }`}
+          >
+            {saving ? (
+              <>
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Saving…
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Save Changes
+              </>
+            )}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function Toast({ message, type, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  const styles = {
+    success: "bg-gray-900 text-white",
+    error:   "bg-red-600 text-white",
+  };
+
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl text-sm font-medium animate-fade-up ${styles[type]}`}>
+      {type === "success" ? (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ) : (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      )}
+      {message}
+    </div>
+  );
+}
+
+// ── Mock booking data ────────────────────────────────────────────────────────
 const MOCK_BOOKINGS = {
   1: [
-    { id: "B001", guest: "Rahul Menon", date: "Jun 14, 2026", amount: "₹8,000", status: "Confirmed" },
-    { id: "B002", guest: "Arjun Das", date: "Jun 20, 2026", amount: "₹8,000", status: "Confirmed" },
-    { id: "B003", guest: "Deepa Kumar", date: "Jun 25, 2026", amount: "₹55,000", status: "Pending" },
+    { id: "B001", guest: "Rahul Menon",  date: "Jun 14, 2026", amount: "₹8,000",  status: "Confirmed" },
+    { id: "B002", guest: "Arjun Das",    date: "Jun 20, 2026", amount: "₹8,000",  status: "Confirmed" },
+    { id: "B003", guest: "Deepa Kumar",  date: "Jun 25, 2026", amount: "₹55,000", status: "Pending"   },
   ],
   2: [
-    { id: "B004", guest: "Priya Nair", date: "Jun 17, 2026", amount: "₹5,500", status: "Pending" },
-    { id: "B005", guest: "Sneha Pillai", date: "Jun 22, 2026", amount: "₹5,500", status: "Cancelled" },
+    { id: "B004", guest: "Priya Nair",   date: "Jun 17, 2026", amount: "₹5,500",  status: "Pending"   },
+    { id: "B005", guest: "Sneha Pillai", date: "Jun 22, 2026", amount: "₹5,500",  status: "Cancelled" },
   ],
   3: [],
 };
 
-// ── Mock venues (match MyVenues.jsx) ────────────────────────────────────────
-const VENUES = {
-  1: {
-    id: 1, name: "The Garden Hall", description: "A lush, open-air event hall surrounded by greenery. Perfect for weddings, receptions, and large corporate gatherings. Features state-of-the-art sound equipment, a dedicated catering area, and ample parking for 150 vehicles.",
-    state: "Kerala", district: "Ernakulam", city: "Kochi", address_line: "Near Marine Drive, MG Road",
-    max_capacity: 300, price_per_hour: 8000, price_per_day: 55000, status: "Active",
-  },
-  2: {
-    id: 2, name: "Rooftop Lounge", description: "A stunning rooftop space with panoramic city views. Ideal for cocktail parties, product launches, and intimate gatherings. Equipped with ambient lighting, a small bar counter, and open-sky seating.",
-    state: "Kerala", district: "Thiruvananthapuram", city: "Trivandrum", address_line: "5th Floor, Technopark Rd",
-    max_capacity: 80, price_per_hour: 5500, price_per_day: 38000, status: "Active",
-  },
-  3: {
-    id: 3, name: "Conference Suite A", description: "A fully equipped modern conference room with AV facilities, whiteboard walls, and ergonomic seating. High-speed Wi-Fi, projector, and video conferencing setup included.",
-    state: "Kerala", district: "Kozhikode", city: "Calicut", address_line: "Business Tower, Mavoor Rd",
-    max_capacity: 30, price_per_hour: 2000, price_per_day: 14000, status: "Draft",
-  },
-};
-
 // ── VenueDetail Page ─────────────────────────────────────────────────────────
 export default function VenueDetail() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const venue = VENUES[id];
+  const { id }       = useParams();
+  const navigate     = useNavigate();
+  const dispatch     = useDispatch();
+
+  const { venue, updateLoading, updateError } = useSelector((state) => state.venue);
+
   const bookings = MOCK_BOOKINGS[id] || [];
 
-  const [status, setStatus] = useState(venue?.status || "Draft");
+  const [status,   setStatus]   = useState("Draft");
+  const [editOpen, setEditOpen] = useState(false);
+  const [toast,    setToast]    = useState(null);
 
   const statusBadge = {
     Active: "bg-green-50 text-green-700 border-green-200",
-    Draft: "bg-gray-100 text-gray-600 border-gray-200",
+    Draft:  "bg-gray-100 text-gray-600 border-gray-200",
   };
 
   const bookingStatusStyles = {
     Confirmed: "bg-green-50 text-green-700",
-    Pending: "bg-amber-50 text-amber-700",
+    Pending:   "bg-amber-50 text-amber-700",
     Cancelled: "bg-red-50 text-red-600",
+  };
+
+  useEffect(() => {
+    dispatch(venueDetail(id));
+  }, [dispatch, id]);
+
+  useEffect(() => {
+    if (venue?.status) setStatus(venue.status);
+  }, [venue?.status]);
+
+  // Prevent body scroll when drawer is open
+  useEffect(() => {
+    document.body.style.overflow = editOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [editOpen]);
+
+  const handleSave = async (changedFields) => {
+    try {
+      await dispatch(updateVenue({ id, fields : changedFields })).unwrap();
+      dispatch(venueDetail(id));
+      setEditOpen(false);
+      setToast({ message: "Venue updated successfully.", type: "success" });
+    } catch {
+      setToast({ message: updateError || "Failed to save changes. Try again.", type: "error" });
+    }
   };
 
   if (!venue) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Sidebar />
+        <VenueOwnerSidebar />
         <main className="lg:pl-64 pt-14 lg:pt-0">
           <div className="flex flex-col items-center justify-center h-[80vh] text-center">
             <p className="text-lg font-semibold text-gray-900 mb-2">Venue not found</p>
@@ -197,11 +481,11 @@ export default function VenueDetail() {
 
   const totalEarnings = bookings
     .filter((b) => b.status === "Confirmed")
-    .reduce((sum, b) => sum + parseInt(b.amount.replace(/[₹,]/g, "")), 0);
+    .reduce((sum, b) => sum + parseInt(b.amount.replace(/[₹,]/g, ""), 10), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar />
+      <VenueOwnerSidebar />
 
       <main className="lg:pl-64 pt-14 lg:pt-0">
         {/* Top bar */}
@@ -223,7 +507,6 @@ export default function VenueDetail() {
 
           {/* ── Hero block ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-            {/* Cover */}
             <div className="w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -245,19 +528,15 @@ export default function VenueDetail() {
                   </p>
                 </div>
 
-                {/* Status toggle */}
                 <div className="flex gap-2 shrink-0">
                   <button
-                    onClick={() => setStatus((s) => s === "Active" ? "Draft" : "Active")}
-                    className={`text-sm font-medium px-3 py-2 rounded-lg border transition-colors ${
-                      status === "Active"
-                        ? "border-red-200 text-red-500 hover:bg-red-50"
-                        : "border-green-200 text-green-600 hover:bg-green-50"
-                    }`}
+                    onClick={() => setEditOpen(true)}
+                    className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
                   >
-                    {status === "Active" ? "Set to Draft" : "Set to Active"}
-                  </button>
-                  <button className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
                     Edit
                   </button>
                 </div>
@@ -272,21 +551,26 @@ export default function VenueDetail() {
 
             {/* Left: details */}
             <div className="lg:col-span-1 flex flex-col gap-5">
-
-              {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
-                <StatPill label="Bookings" value={bookings.length} accent="purple" />
-                <StatPill label="Capacity" value={venue.max_capacity} accent="blue" />
-                <StatPill
-                  label="Earned"
-                  value={`₹${(totalEarnings / 1000).toFixed(0)}k`}
-                  accent="green"
-                />
+                <StatPill label="Bookings" value={bookings.length}                                   accent="purple" />
+                <StatPill label="Capacity" value={venue.max_capacity}                                accent="blue"   />
+                <StatPill label="Earned"   value={`₹${(totalEarnings / 1000).toFixed(0)}k`}          accent="green"  />
               </div>
 
-              {/* Venue info */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <h2 className="font-semibold text-gray-900 mb-2">Venue Details</h2>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-semibold text-gray-900">Venue Details</h2>
+                  <button
+                    onClick={() => setEditOpen(true)}
+                    className="text-[11px] font-semibold text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-1"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Edit
+                  </button>
+                </div>
 
                 <DetailRow
                   icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>}
@@ -309,7 +593,6 @@ export default function VenueDetail() {
                   value={`₹${venue.price_per_day.toLocaleString("en-IN")}`}
                 />
               </div>
-
             </div>
 
             {/* Right: bookings */}
@@ -364,6 +647,32 @@ export default function VenueDetail() {
           </div>
         </div>
       </main>
+
+      {/* Edit Drawer */}
+      <EditDrawer
+        venue={venue}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={handleSave}
+        saving={updateLoading}
+      />
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onDone={() => setToast(null)}
+        />
+      )}
+
+      <style>{`
+        @keyframes fade-up {
+          from { opacity: 0; transform: translate(-50%, 12px); }
+          to   { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .animate-fade-up { animation: fade-up 0.2s ease-out both; }
+      `}</style>
     </div>
   );
 }

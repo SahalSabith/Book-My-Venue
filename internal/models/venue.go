@@ -61,7 +61,7 @@ func (m *VenueModel) GetById(id int) (*Venue, error) {
 		max_capacity,
 		updated_at,
 		created_at
-	FROM venues WHERE id = $1
+	FROM venues WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	var venue Venue
@@ -108,7 +108,7 @@ func (m *VenueModel) GetUserVenues(owner_id int) ([]Venue,error) {
 		updated_at,
 		created_at
 	FROM venues 
-	WHERE owner_id = $1
+	WHERE owner_id = $1 AND deleted_at IS NULL
 	`
 
 	rows, err := m.DB.Query(stmt,owner_id)
@@ -189,7 +189,7 @@ func (m *VenueModel) UpdateField(id int, fields map[string]any) error {
 	stmt := fmt.Sprintf(`
 		UPDATE venues
 		SET %s
-		WHERE id = $%d
+		WHERE id = $%d AND deleted_at IS NULL
 	`,
 	strings.Join(setValues,", "),
 	i,

@@ -53,7 +53,7 @@ func (app *application) createVenue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		http.Error(w, err.Error() , http.StatusBadRequest)
 		return
 	}
 
@@ -137,5 +137,127 @@ func (app *application) getVenue(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+func (app *application) updateVenue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ownerId := r.Context().Value(userContextKey).(int)
+	role := r.Context().Value(roleContextKey).(string)
+
+	if role != "owner" {
+		http.Error(w, "User dont have access", http.StatusUnauthorized)
+		return
+	}
+	
+	idStr := r.PathValue("id")
+
+	venueID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid venue ID", http.StatusBadRequest)
+		return
+	}
+
+	venue, err := app.venues.GetById(venueID)
+
+	if err != nil {
+		http.Error(w, "Venue not found",http.StatusNotFound)
+		return
+	}
+
+	if venue.OwnerID != ownerId {
+		http.Error(w, "User dont have access", http.StatusUnauthorized)
+		return
+	}
+
+	var fields map[string]any
+
+	err = json.NewDecoder(r.Body).Decode(&fields)
+	if err != nil {
+		http.Error(w,"invalid request body" , http.StatusBadRequest)
+		return
+	}
+
+	if len(fields) == 0 {
+		http.Error(w,"No Fields provided" , http.StatusBadRequest)
+		return
+	}
+
+	err = app.venues.UpdateField(venueID,fields)
+	if err != nil {
+		http.Error(w,err.Error(),http.StatusBadRequest)
+		return
+	}
+
+	response := map[string]string{
+		"message": "venue updated successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+
+func (app *application) deleteVenue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ownerId := r.Context().Value(userContextKey).(int)
+	role := r.Context().Value(roleContextKey).(string)
+
+	if role != "owner" {
+		http.Error(w, "User dont have access", http.StatusUnauthorized)
+		return
+	}
+	
+	idStr := r.PathValue("id")
+
+	venueID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid venue ID", http.StatusBadRequest)
+		return
+	}
+
+	venue, err := app.venues.GetById(venueID)
+
+	if err != nil {
+		http.Error(w, "Venue not found",http.StatusNotFound)
+		return
+	}
+
+	if venue.OwnerID != ownerId {
+		http.Error(w, "User dont have access", http.StatusUnauthorized)
+		return
+	}
+
+	stmt := `
+		UPDATE venues 
+		SET deleted_at = NOW()
+		WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
+	`
+
+	result, err := app.venues.DB.ExecContext(r.Context(), stmt, venueID, ownerId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected == 0 {
+		http.Error(w,err.Error(),http.StatusNotFound)
+		return
+	}
+
+	response := map[string]string{
+		"message": "Venue deleted successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

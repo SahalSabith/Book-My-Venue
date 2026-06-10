@@ -77,6 +77,8 @@ func main() {
 
 	mux.HandleFunc("/create-venue",app.requiredAuthentication(app.createVenue))
 	mux.HandleFunc("/get-venues",app.requiredAuthentication(app.getVenuesByUser))
+	mux.HandleFunc("/update-venue/{id}",app.requiredAuthentication(app.updateVenue))
+	mux.HandleFunc("/delete-venue/{id}",app.requiredAuthentication(app.deleteVenue))
 	mux.HandleFunc("/venue-details/{id}",app.getVenue)
 
 	// app.requiredAuthentication
