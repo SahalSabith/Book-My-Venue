@@ -1,37 +1,24 @@
 import Header from "../Components/Header";
 import Footer from "../Components/Footer";
-
-const venues = [
-  {
-    id: 1,
-    name: "The Grand Atrium",
-    type: "Auditorium",
-    location: "Thiruvananthapuram",
-    price: "₹8,500",
-    capacity: "500 guests",
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80",
-  },
-  {
-    id: 2,
-    name: "Brew & Co. Café",
-    type: "Café Space",
-    location: "Kochi",
-    price: "₹1,200",
-    capacity: "30 guests",
-    image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=600&q=80",
-  },
-  {
-    id: 3,
-    name: "Canvas Studio",
-    type: "Creative Studio",
-    location: "Kozhikode",
-    price: "₹2,500",
-    capacity: "20 guests",
-    image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&q=80",
-  },
-];
+import { listVenues } from "../Redux/Slice/venueSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Home() {
+  const dispatch = useDispatch()
+  const { venues } = useSelector((state) => state.venue)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    try {
+      const response = dispatch(listVenues())
+      
+    } catch (error) {
+      
+    }
+  },[dispatch])
+
   return (
     <div
       className="min-h-screen bg-white text-gray-900"
@@ -99,21 +86,48 @@ export default function Home() {
               <div
                 key={v.id}
                 className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:shadow-md transition-shadow"
+                onClick={() => navigate(`/venue/${v.id}`)}
               >
-                <img src={v.image} className="h-44 w-full object-cover" alt={v.name} />
+
+                <img
+                  src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800"
+                  className="h-44 w-full object-cover"
+                  alt={v.name}
+                />
+
                 <div className="p-4">
-                  <span className="text-xs text-gray-400 font-medium">{v.type}</span>
-                  <h3 className="font-semibold mt-1 text-gray-900">{v.name}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">{v.location}</p>
+
+                  <span className="text-xs text-gray-400 font-medium">
+                    Capacity: {v.max_capacity} people
+                  </span>
+
+                  <h3 className="font-semibold mt-1 text-gray-900">
+                    {v.name}
+                  </h3>
+
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {v.district}
+                  </p>
+
+                  <p className="text-sm text-gray-500 mt-2 line-clamp-2">
+                    {v.description}
+                  </p>
+
                   <div className="flex justify-between items-center mt-4">
+
                     <p className="font-bold text-gray-900">
-                      {v.price}
-                      <span className="text-xs text-gray-400 font-normal"> /hr</span>
+                      ₹{v.price_per_hour}
+                      <span className="text-xs text-gray-400 font-normal">
+                        {" "}/hr
+                      </span>
                     </p>
+
                     <button className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all">
                       Book
                     </button>
+
                   </div>
+
                 </div>
               </div>
             ))}

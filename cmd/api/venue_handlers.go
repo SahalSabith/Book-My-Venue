@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -117,9 +119,9 @@ func (app *application) getVenue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := r.PathValue("id")
+	venueID, err := strconv.Atoi(r.PathValue("id"))
+	ownerId := r.Context().Value(userContextKey).(int)
 
-	venueID, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "invalid venue ID", http.StatusBadRequest)
 		return
@@ -128,6 +130,11 @@ func (app *application) getVenue(w http.ResponseWriter, r *http.Request) {
 	venue, err := app.venues.GetById(venueID)
 	if err != nil {
 		http.Error(w, "Failed to fetch venue",http.StatusBadRequest)
+		return
+	}
+
+	if venue.OwnerID != ownerId {
+		http.Error(w, "dont have access to this data",http.StatusUnauthorized)
 		return
 	}
 
@@ -153,10 +160,8 @@ func (app *application) updateVenue(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User dont have access", http.StatusUnauthorized)
 		return
 	}
-	
-	idStr := r.PathValue("id")
 
-	venueID, err := strconv.Atoi(idStr)
+	venueID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "invalid venue ID", http.StatusBadRequest)
 		return
@@ -216,9 +221,7 @@ func (app *application) deleteVenue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	idStr := r.PathValue("id")
-
-	venueID, err := strconv.Atoi(idStr)
+	venueID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		http.Error(w, "invalid venue ID", http.StatusBadRequest)
 		return
@@ -259,5 +262,151 @@ func (app *application) deleteVenue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+
+func (app *application) listVenus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type Venue struct {
+		ID int `json:"id"`
+		Name string `json:"name"`
+		Description string `json:"description"`
+		District string `json:"district"`
+		PricePerHour int64 `json:"price_per_hour"`
+		MaxCapacity int64 `json:"max_capacity"`
+	}
+
+	stmt := `
+		SELECT 
+		id,
+		name,
+		description,
+		district,
+		price_per_hour,
+		max_capacity
+	FROM venues 
+	WHERE deleted_at IS NULL
+	`
+
+	rows, err := app.venues.DB.Query(stmt)
+	if err != nil {
+		http.Error(w, err.Error(),http.StatusNotFound)
+		return
+	}
+
+	defer rows.Close()
+
+	venues := []Venue{}
+	
+	for rows.Next() {
+		var venue Venue
+
+		err := rows.Scan(
+			&venue.ID,
+			&venue.Name,
+			&venue.Description,
+			&venue.District,
+			&venue.PricePerHour,
+			&venue.MaxCapacity,
+		)
+
+		if err != nil {
+			http.Error(w,err.Error(),http.StatusInternalServerError)
+			return
+		}
+
+		venues = append(venues, venue)
+	}
+
+	if err = rows.Err(); err != nil {
+		http.Error(w,err.Error(),http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]any{
+		"message": "Venue deleted successfully",
+		"venues":venues,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+
+func (app *application) getVeneDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	venueID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid venue ID", http.StatusBadRequest)
+		return
+	}
+
+	type Venue struct {
+		ID int `json:"id"`
+		Name string `json:"name"`
+		Description string `json:"description"`
+		District string `json:"district"`
+		State string `json:"state"`
+		City string `json:"city"`
+		AddressLine string `json:"address_line"`
+		PricePerDay int64 `json:"price_per_day"`
+		PricePerHour int64 `json:"price_per_hour"`
+		MaxCapacity int64 `json:"max_capacity"`
+	}
+
+	stmt := `
+	SELECT 
+		id,
+		name,
+		description,
+		district,
+		state,
+		city,
+		address_line,
+		price_per_day,
+		price_per_hour,
+		max_capacity
+	FROM venues WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	var venue Venue
+
+	err = app.venues.DB.QueryRow(stmt,venueID).Scan(
+		&venue.ID,
+		&venue.Name,
+		&venue.Description,
+		&venue.District,
+		&venue.State,
+		&venue.City,
+		&venue.AddressLine,
+		&venue.PricePerDay,
+		&venue.PricePerHour,
+		&venue.MaxCapacity,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w,"User not found",http.StatusNotFound)
+			return
+		}
+		http.Error(w,err.Error(),http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]any{
+		"venue":venue,
+	}
+
+	w.Header().Set("Content-Type","application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }

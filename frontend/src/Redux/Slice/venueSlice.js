@@ -46,11 +46,17 @@ export const getVenues = createAsyncThunk(
 
 export const venueDetail = createAsyncThunk(
   "venue/venueDetail",
-  async (id, { rejectWithValue }) => {
+  async (id, { rejectWithValue,getState }) => {
     try {
+      const token = getState().auth.token;
+
       const response = await axios.get(
-        `http://localhost:4000/venue-details/${id}`
-      );
+        `http://localhost:4000/venue-details/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -100,9 +106,42 @@ export const deleteVenue = createAsyncThunk(
 );
 
 
+export const listVenues = createAsyncThunk(
+  "venue/listVenues",
+  async ( _, {rejectWithValue }) => {
+    try {
+      const response = await axios.get(
+        "http://localhost:4000/list-venues"
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+
+export const userVenueDetail = createAsyncThunk(
+  "venue/userVenueDetail",
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:4000/user-venue-details/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+
+
 const initialState = {
   loading: false,
   error: null,
+  ownerVenues:[],
+  ownerVenue:null,
   venues:[],
   venue:null,
 };
@@ -122,13 +161,12 @@ const venueSlice = createSlice({
 
     .addCase(getVenues.fulfilled, (state, action) => {
         state.loading = false;
-        state.venues = action.payload.venues
+        state.ownerVenues = action.payload.venues
     }) 
 
     .addCase(venueDetail.fulfilled, (state, action) => {
         state.loading = false;
-        state.venue = action.payload.venues
-        console.log(action.payload.venues)
+        state.ownerVenue = action.payload.venues
     })
 
     .addCase(updateVenue.fulfilled, (state, action) => {
@@ -139,6 +177,16 @@ const venueSlice = createSlice({
         state.loading = false;
     })
 
+    .addCase(listVenues.fulfilled, (state, action) => {
+        state.loading = false;
+        state.venues = action.payload.venues
+    })
+
+    .addCase(userVenueDetail.fulfilled, (state, action) => {
+        state.loading = false;
+        state.venue = action.payload.venue
+    })
+
     // ALL PENDING REQUESTS
     .addMatcher(
     isPending(
@@ -146,7 +194,9 @@ const venueSlice = createSlice({
         getVenues,
         venueDetail,
         updateVenue,
-        deleteVenue
+        deleteVenue,
+        listVenues,
+        userVenueDetail
     ),
     (state) => {
         state.loading = true;
@@ -161,7 +211,9 @@ const venueSlice = createSlice({
         getVenues,
         venueDetail,
         updateVenue,
-        deleteVenue
+        deleteVenue,
+        listVenues,
+        userVenueDetail
     ),
     (state, action) => {
         state.loading = false;

@@ -322,7 +322,7 @@ function EmptyState({ onAdd }) {
 export default function MyVenues() {
   const dispatch        = useDispatch();
   const navigate        = useNavigate();
-  const { venues }      = useSelector((state) => state.venue);
+  const { ownerVenues }      = useSelector((state) => state.venue);
 
   const [showModal, setShowModal] = useState(false);
   const [search,    setSearch]    = useState("");
@@ -340,7 +340,7 @@ export default function MyVenues() {
     if (value === "book") navigate("/");
   };
 
-  const filtered = venues.filter((v) => {
+  const filtered = ownerVenues.filter((v) => {
     const matchSearch =
       v.name.toLowerCase().includes(search.toLowerCase()) ||
       v.city.toLowerCase().includes(search.toLowerCase());
@@ -370,7 +370,7 @@ export default function MyVenues() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">My Venues</h1>
               <p className="text-sm text-gray-500 mt-0.5">
-                {venues.length} {venues.length === 1 ? "venue" : "venues"}
+                {ownerVenues.length} {ownerVenues.length === 1 ? "venue" : "venues"}
               </p>
             </div>
             <button
@@ -385,7 +385,7 @@ export default function MyVenues() {
           </div>
 
           {/* Filters */}
-          {venues.length > 0 && (
+          {ownerVenues.length > 0 && (
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <div className="relative flex-1 max-w-sm">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -418,7 +418,7 @@ export default function MyVenues() {
           )}
 
           {/* Grid */}
-          {venues.length === 0 ? (
+          {ownerVenues.length === 0 ? (
             <EmptyState onAdd={() => setShowModal(true)} />
           ) : filtered.length === 0 ? (
             <div className="py-16 text-center">

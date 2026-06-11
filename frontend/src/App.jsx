@@ -7,6 +7,7 @@ import ForgotPassword from "./Pages/ForgotPassword";
 import Home from "./Pages/Home";
 import VenueOwner from "./Pages/VenueOwner";
 import MyVenues from "./Pages/MyVenues";
+import OwnerVenueDetail from "./Pages/OwnerVenueDetail";
 import VenueDetail from "./Pages/VenueDetail";
 
 import ProtectedRoute from "./Components/ProtectedRoute";
@@ -24,11 +25,12 @@ const App = () => {
 
         {/* Main app — accessible to anyone, header handles login state */}
         <Route path="/" element={<Home />} />
+        <Route path="/venue/:id" element={<VenueDetail />} />
 
         {/* Owner-only dashboard */}
         <Route path="/venue-owner" element={<OwnerRoute><VenueOwner /></OwnerRoute>} />
         <Route path="/venue-owner/venues" element={<OwnerRoute><MyVenues /></OwnerRoute>} />
-        <Route path="/venue-owner/venues/:id" element={<OwnerRoute><VenueDetail /></OwnerRoute>} />
+        <Route path="/venue-owner/venues/:id" element={<OwnerRoute><OwnerVenueDetail /></OwnerRoute>} />
       </Routes>
     </BrowserRouter>
   );
