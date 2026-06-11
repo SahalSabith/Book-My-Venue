@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"github.com/lib/pq"
 )
 
 type Venue struct {
@@ -25,24 +26,28 @@ type Venue struct {
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	Images []string `json:"images"`
 }
 
 type VenueModel struct {
 	DB *sql.DB
 }
 
-func (m *VenueModel) Insert(ownerId int, maxCapacity,pricePerHour,pricePerDay int64, name,description,district,state,city,addressLine string) error {
+func (m *VenueModel) Insert(ownerId int, maxCapacity,pricePerHour,pricePerDay int64, name,description,district,state,city,addressLine string) (int,error) {
 	stmt := `
 		INSERT INTO venues (owner_id, name, description, state, district, city, address_line, price_per_day, price_per_hour, max_capacity)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING id
 	`
 
-	_,err := m.DB.Exec(stmt, ownerId, name, description, state, district, city, addressLine, pricePerDay, pricePerHour, maxCapacity)
+	var id int
+
+	err := m.DB.QueryRow(stmt, ownerId, name, description, state, district, city, addressLine, pricePerDay, pricePerHour, maxCapacity).Scan(&id)
 	if err != nil {
-		return err
+		return 0,err
 	}
 
-	return nil
+	return id,nil
 }
 
 func (m *VenueModel) GetById(id int) (*Venue, error) {
@@ -60,7 +65,8 @@ func (m *VenueModel) GetById(id int) (*Venue, error) {
 		price_per_hour,
 		max_capacity,
 		updated_at,
-		created_at
+		created_at,
+		images
 	FROM venues WHERE id = $1 AND deleted_at IS NULL
 	`
 
@@ -80,6 +86,7 @@ func (m *VenueModel) GetById(id int) (*Venue, error) {
 		&venue.MaxCapacity,
 		&venue.UpdatedAt,
 		&venue.CreatedAt,
+		pq.Array(&venue.Images),
 	)
 
 	if err != nil {
@@ -106,7 +113,8 @@ func (m *VenueModel) GetUserVenues(owner_id int) ([]Venue,error) {
 		price_per_hour,
 		max_capacity,
 		updated_at,
-		created_at
+		created_at,
+		images
 	FROM venues 
 	WHERE owner_id = $1 AND deleted_at IS NULL
 	`
@@ -137,6 +145,7 @@ func (m *VenueModel) GetUserVenues(owner_id int) ([]Venue,error) {
 			&venue.MaxCapacity,
 			&venue.UpdatedAt,
 			&venue.CreatedAt,
+			pq.Array(&venue.Images),
 		)
 
 		if err != nil {

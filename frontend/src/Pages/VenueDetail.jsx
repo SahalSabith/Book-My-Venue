@@ -453,12 +453,7 @@ export default function VenueDetail() {
         {/* ── Hero placeholder image strip ── */}
         <div className="bg-gray-100 h-64 sm:h-80 flex items-center justify-center overflow-hidden">
           <div className="text-center text-gray-300">
-            <svg className="mx-auto mb-2" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <path d="m21 15-5-5L5 21"/>
-            </svg>
-            <p className="text-sm">Venue photos coming soon</p>
+            <img src={venue.images} className="h-44 w-full object-cover" alt={venue.name}/>
           </div>
         </div>
 

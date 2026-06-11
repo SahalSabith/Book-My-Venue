@@ -1,12 +1,19 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"github.com/lib/pq"
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"github.com/joho/godotenv"
 )
 
 func (app *application) createVenue(w http.ResponseWriter, r *http.Request) {
@@ -68,14 +75,15 @@ func (app *application) createVenue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = app.venues.Insert(ownerId,input.MaxCapacity,input.PricePerHour,input.PricePerDay,input.Name,input.Description,input.District,input.State,input.City,input.AddressLine)
+	venueId,err := app.venues.Insert(ownerId,input.MaxCapacity,input.PricePerHour,input.PricePerDay,input.Name,input.Description,input.District,input.State,input.City,input.AddressLine)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	response := map[string]string{
+	response := map[string]any{
 		"message":"Venue Created Succesfully",
+		"id":venueId,
 	}
 
 	w.Header().Set("Content-Type","application/json")
@@ -279,6 +287,7 @@ func (app *application) listVenus(w http.ResponseWriter, r *http.Request) {
 		District string `json:"district"`
 		PricePerHour int64 `json:"price_per_hour"`
 		MaxCapacity int64 `json:"max_capacity"`
+		Images []string `json:"images"`
 	}
 
 	stmt := `
@@ -288,7 +297,8 @@ func (app *application) listVenus(w http.ResponseWriter, r *http.Request) {
 		description,
 		district,
 		price_per_hour,
-		max_capacity
+		max_capacity,
+		images
 	FROM venues 
 	WHERE deleted_at IS NULL
 	`
@@ -313,6 +323,7 @@ func (app *application) listVenus(w http.ResponseWriter, r *http.Request) {
 			&venue.District,
 			&venue.PricePerHour,
 			&venue.MaxCapacity,
+			pq.Array(&venue.Images),
 		)
 
 		if err != nil {
@@ -361,6 +372,7 @@ func (app *application) getVeneDetail(w http.ResponseWriter, r *http.Request) {
 		PricePerDay int64 `json:"price_per_day"`
 		PricePerHour int64 `json:"price_per_hour"`
 		MaxCapacity int64 `json:"max_capacity"`
+		Images []string `json:"images"`
 	}
 
 	stmt := `
@@ -374,7 +386,8 @@ func (app *application) getVeneDetail(w http.ResponseWriter, r *http.Request) {
 		address_line,
 		price_per_day,
 		price_per_hour,
-		max_capacity
+		max_capacity,
+		images
 	FROM venues WHERE id = $1 AND deleted_at IS NULL
 	`
 
@@ -391,6 +404,7 @@ func (app *application) getVeneDetail(w http.ResponseWriter, r *http.Request) {
 		&venue.PricePerDay,
 		&venue.PricePerHour,
 		&venue.MaxCapacity,
+		pq.Array(&venue.Images),
 	)
 
 	if err != nil {
@@ -409,4 +423,93 @@ func (app *application) getVeneDetail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+type UploadResponse struct {
+	Message string `json:"message"`
+	URLs []string `json:"urls"`
+}
+
+func (app *application) venueImageUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ownerId := r.Context().Value(userContextKey).(int)
+	role := r.Context().Value(roleContextKey).(string)
+
+	if role != "owner" {
+		http.Error(w, "User dont have access", http.StatusUnauthorized)
+		return
+	}
+	err := r.ParseMultipartForm(20 << 20)
+	if err != nil {
+		http.Error(w, "Files too large. Max total 20MP",http.StatusBadRequest)
+		return
+	}
+
+	venueID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w,"Invalid venue ID",http.StatusBadRequest)
+		return
+	}
+
+	files := r.MultipartForm.File["venue_images"]
+	if len(files) == 0 {
+		http.Error(w, "No images provided", http.StatusBadRequest)
+		return
+	}
+
+	err = godotenv.Load()
+
+	if err != nil {
+		log.Fatal("Error loading .env")
+	}
+
+	cloud_name := os.Getenv("CLOUDINARY_NAME")
+	api_key := os.Getenv("CLOUDINARY_API_KEY")
+	api_secret := os.Getenv("CLOUDINARY_API_SECRET")
+
+	cld, err := cloudinary.NewFromParams(cloud_name, api_key, api_secret)
+	if err != nil {
+		http.Error(w, "Storage config error", http.StatusInternalServerError)
+		return
+	}
+
+	var uploadedURLs []string
+
+	for _, fileHeader := range files {
+		file, err := fileHeader.Open()
+		if err != nil {
+			continue // Skip corrupted individual files instead of crashing the whole request
+		}
+		
+		ctx := context.Background()
+		uploadResult, err := cld.Upload.Upload(ctx, file, uploader.UploadParams{
+			Folder: "bookmyvenue/venues",
+		})
+		file.Close()
+		if err != nil {
+			continue // If one image upload fails to Cloudinary, keep processing the next ones
+		}
+
+		// 4. Append this specific URL directly into the PostgreSQL array column
+		stmt := `
+			UPDATE venues 
+			SET images = array_append(images, $1) 
+			WHERE id = $2 AND owner_id = $3 AND deleted_at IS NULL
+		`
+		_, err = app.venues.DB.ExecContext(r.Context(), stmt, uploadResult.SecureURL, venueID, ownerId)
+		if err == nil {
+			uploadedURLs = append(uploadedURLs, uploadResult.SecureURL)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(UploadResponse{
+		Message: "Processing complete",
+		URLs:    uploadedURLs,
+	})
 }

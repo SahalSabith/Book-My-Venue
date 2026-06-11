@@ -136,6 +136,26 @@ export const userVenueDetail = createAsyncThunk(
 );
 
 
+export const uploadVenueImage = createAsyncThunk(
+  "venue/uploadVenueImage",
+  async ({venueId,formData}, { rejectWithValue,getState }) => {
+    try {
+      const token = getState().auth.token;
+
+      const response = await axios.post(
+        `http://localhost:4000/upload-venue-image/${venueId}`,formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 
 const initialState = {
   loading: false,
@@ -187,6 +207,10 @@ const venueSlice = createSlice({
         state.venue = action.payload.venue
     })
 
+    .addCase(uploadVenueImage.fulfilled, (state, action) => {
+        state.loading = false;
+    }) 
+
     // ALL PENDING REQUESTS
     .addMatcher(
     isPending(
@@ -196,7 +220,8 @@ const venueSlice = createSlice({
         updateVenue,
         deleteVenue,
         listVenues,
-        userVenueDetail
+        userVenueDetail,
+        uploadVenueImage
     ),
     (state) => {
         state.loading = true;
@@ -213,7 +238,8 @@ const venueSlice = createSlice({
         updateVenue,
         deleteVenue,
         listVenues,
-        userVenueDetail
+        userVenueDetail,
+        uploadVenueImage
     ),
     (state, action) => {
         state.loading = false;
