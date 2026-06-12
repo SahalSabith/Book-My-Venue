@@ -13,6 +13,42 @@ const MONTHS = [
 ];
 const DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 
+const EVENT_PURPOSES = [
+  "Wedding",
+  "Birthday party",
+  "Corporate meeting",
+  "Product launch",
+  "Photo / video shoot",
+  "Workshop / seminar",
+  "Social gathering",
+  "Other",
+];
+
+// Generate time options in 30-min increments: "06:00 AM" ... "11:30 PM"
+function generateTimeSlots() {
+  const slots = [];
+  for (let h = 6; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const ampm = h >= 12 ? "PM" : "AM";
+      const label = `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+      const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      slots.push({ label, value });
+    }
+  }
+  return slots;
+}
+const TIME_SLOTS = generateTimeSlots();
+
+function timeToMinutes(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+function diffHours(start, end) {
+  const diff = (timeToMinutes(end) - timeToMinutes(start)) / 60;
+  return diff > 0 ? diff : 0;
+}
+
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -60,7 +96,6 @@ function Calendar({ selected, dragStart, dragEnd, onMouseDown, onMouseEnter, onM
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDay(year, month);
 
-  // Determine highlight range
   let rangeStart = null, rangeEnd = null;
   if (dragStart && dragEnd) {
     const a = parseKey(dragStart), b = parseKey(dragEnd);
@@ -82,33 +117,18 @@ function Calendar({ selected, dragStart, dragEnd, onMouseDown, onMouseEnter, onM
 
   return (
     <div className="select-none">
-      {/* Month nav */}
       <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={prev}
-          className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-500"
-        >
-          ‹
-        </button>
-        <span className="text-sm font-semibold text-gray-800">
-          {MONTHS[month]} {year}
-        </span>
-        <button
-          onClick={next}
-          className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-500"
-        >
-          ›
-        </button>
+        <button onClick={prev} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-500">‹</button>
+        <span className="text-sm font-semibold text-gray-800">{MONTHS[month]} {year}</span>
+        <button onClick={next} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-gray-500">›</button>
       </div>
 
-      {/* Day labels */}
       <div className="grid grid-cols-7 mb-1">
         {DAYS.map(d => (
           <div key={d} className="text-center text-[11px] font-medium text-gray-400 pb-1">{d}</div>
         ))}
       </div>
 
-      {/* Cells */}
       <div className="grid grid-cols-7 gap-y-0.5">
         {cells.map((day, idx) => {
           if (!day) return <div key={`e-${idx}`} />;
@@ -137,7 +157,6 @@ function Calendar({ selected, dragStart, dragEnd, onMouseDown, onMouseEnter, onM
             cellClass += "text-gray-700 hover:bg-gray-100";
           }
 
-          // Range edge rounding
           let extraStyle = {};
           if (isInRange) {
             if (isStart) extraStyle.borderRadius = "8px 0 0 8px";
@@ -178,9 +197,20 @@ function BookingModal({ venue, onClose }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [dragEnd, setDragEnd] = useState(null);
-  const [bookingType, setBookingType] = useState("day"); // "day" | "hour"
-  const [hours, setHours] = useState(2);
-  const [step, setStep] = useState(1); // 1=pick dates, 2=confirm
+  const [bookingType, setBookingType] = useState("day");
+
+  // Hourly time
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("11:00");
+
+  // Guest count
+  const [guests, setGuests] = useState(1);
+
+  // Event purpose
+  const [purpose, setPurpose] = useState("");
+  const [otherPurpose, setOtherPurpose] = useState("");
+
+  const [step, setStep] = useState(1);
 
   const today = dateKey(
     new Date().getFullYear(),
@@ -209,20 +239,66 @@ function BookingModal({ venue, onClose }) {
   };
 
   const days = selected.start && selected.end ? diffDays(selected.start, selected.end) : 0;
+  const hoursDiff = diffHours(startTime, endTime);
+
   const totalPrice = bookingType === "day"
     ? days * (venue?.price_per_day || 0)
-    : hours * (venue?.price_per_hour || 0);
+    : hoursDiff * (venue?.price_per_hour || 0);
 
-  const canProceed = bookingType === "day" ? days > 0 : true;
+  // Valid end times must be after start time
+  const validEndTimes = TIME_SLOTS.filter(
+    t => timeToMinutes(t.value) > timeToMinutes(startTime)
+  );
+
+  // Fix endTime if it becomes invalid after startTime change
+  const handleStartTimeChange = (val) => {
+    setStartTime(val);
+    if (timeToMinutes(endTime) <= timeToMinutes(val)) {
+      const next = TIME_SLOTS.find(t => timeToMinutes(t.value) > timeToMinutes(val));
+      if (next) setEndTime(next.value);
+    }
+  };
+
+  const effectivePurpose = purpose === "Other" ? otherPurpose : purpose;
+
+  const canProceed =
+    (bookingType === "day" ? days > 0 : selected.start && hoursDiff > 0) &&
+    guests >= 1 &&
+    effectivePurpose.trim() !== "";
+
+  // Build booking payload
+  const buildPayload = () => {
+    const base = {
+      venue_id: venue?.id,
+      guests,
+      purpose: effectivePurpose,
+    };
+    if (bookingType === "day") {
+      return {
+        ...base,
+        booking_type: "day",
+        start_date: selected.start,
+        end_date: selected.end,
+      };
+    } else {
+      return {
+        ...base,
+        booking_type: "hour",
+        date: selected.start,
+        start_time: startTime,
+        end_time: endTime,
+      };
+    }
+  };
 
   return (
     <div
       className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Book this venue</h2>
             <p className="text-xs text-gray-400 mt-0.5">{venue?.name}</p>
@@ -230,10 +306,10 @@ function BookingModal({ venue, onClose }) {
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition-colors text-xl leading-none">×</button>
         </div>
 
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 overflow-y-auto flex-1">
           {step === 1 && (
             <>
-              {/* Booking type */}
+              {/* Booking type toggle */}
               <div className="flex bg-gray-100 rounded-xl p-1 mb-5">
                 {["day", "hour"].map(t => (
                   <button
@@ -246,9 +322,9 @@ function BookingModal({ venue, onClose }) {
                 ))}
               </div>
 
+              {/* ── Date picker ── */}
               {bookingType === "day" ? (
                 <>
-                  {/* Drag hint */}
                   <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
                     <span className="inline-block w-4 h-4 bg-gray-200 rounded text-center leading-4 text-[10px]">⟺</span>
                     Click and drag to select your dates
@@ -278,8 +354,8 @@ function BookingModal({ venue, onClose }) {
                   )}
                 </>
               ) : (
-                <div className="space-y-5">
-                  <p className="text-xs text-gray-400">Pick a date and number of hours</p>
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-400">Pick a date and set your time slot</p>
                   <Calendar
                     selected={selected}
                     dragStart={null}
@@ -289,32 +365,120 @@ function BookingModal({ venue, onClose }) {
                     onMouseUp={() => {}}
                     today={today}
                   />
+
+                  {/* Time slot picker */}
                   {selected.start && (
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">Hours needed: <span className="text-gray-900 font-bold">{hours}h</span></label>
-                      <input
-                        type="range" min={1} max={12} step={1}
-                        value={hours}
-                        onChange={e => setHours(Number(e.target.value))}
-                        className="w-full accent-gray-900"
-                      />
-                      <div className="flex justify-between text-[10px] text-gray-300 mt-1">
-                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(h => <span key={h}>{h}</span>)}
-                      </div>
-                      <div className="mt-4 flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                        <div className="text-xs text-gray-500">
-                          <div className="font-medium text-gray-800">{formatDisplay(selected.start)}</div>
-                          <div className="text-gray-400 mt-0.5">{hours} hour{hours !== 1 ? "s" : ""}</div>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 block mb-1.5">Start time</label>
+                          <select
+                            value={startTime}
+                            onChange={e => handleStartTimeChange(e.target.value)}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
+                          >
+                            {TIME_SLOTS.map(t => (
+                              <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
+                          </select>
                         </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-gray-900">₹{(hours * venue?.price_per_hour).toLocaleString()}</div>
-                          <div className="text-xs text-gray-400">{hours}h × ₹{venue?.price_per_hour?.toLocaleString()}/hr</div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 block mb-1.5">End time</label>
+                          <select
+                            value={endTime}
+                            onChange={e => setEndTime(e.target.value)}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
+                          >
+                            {validEndTimes.map(t => (
+                              <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
+
+                      {hoursDiff > 0 && (
+                        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                          <div className="text-xs text-gray-500">
+                            <div className="font-medium text-gray-800">{formatDisplay(selected.start)}</div>
+                            <div className="text-gray-400 mt-0.5">
+                              {TIME_SLOTS.find(t => t.value === startTime)?.label} → {TIME_SLOTS.find(t => t.value === endTime)?.label}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-gray-900">₹{(hoursDiff * venue?.price_per_hour).toLocaleString()}</div>
+                            <div className="text-xs text-gray-400">{hoursDiff}h × ₹{venue?.price_per_hour?.toLocaleString()}/hr</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
+
+              {/* ── Guest count ── */}
+              <div className="mt-5">
+                <label className="text-xs font-medium text-gray-600 block mb-2">
+                  Number of guests
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setGuests(g => Math.max(1, g - 1))}
+                    className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors text-lg font-light"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={venue?.max_capacity || 9999}
+                    value={guests}
+                    onChange={e => {
+                      const v = parseInt(e.target.value) || 1;
+                      setGuests(Math.min(Math.max(1, v), venue?.max_capacity || 9999));
+                    }}
+                    className="w-16 text-center border border-gray-200 rounded-xl py-2 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                  />
+                  <button
+                    onClick={() => setGuests(g => Math.min(g + 1, venue?.max_capacity || 9999))}
+                    className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors text-lg font-light"
+                  >
+                    +
+                  </button>
+                  <span className="text-xs text-gray-400">max {venue?.max_capacity?.toLocaleString()} people</span>
+                </div>
+              </div>
+
+              {/* ── Event purpose ── */}
+              <div className="mt-5">
+                <label className="text-xs font-medium text-gray-600 block mb-2">
+                  Purpose of event
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {EVENT_PURPOSES.map(p => (
+                    <button
+                      key={p}
+                      onClick={() => { setPurpose(p); if (p !== "Other") setOtherPurpose(""); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                        purpose === p
+                          ? "bg-gray-900 text-white border-gray-900"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                {purpose === "Other" && (
+                  <input
+                    type="text"
+                    placeholder="Describe your event…"
+                    value={otherPurpose}
+                    onChange={e => setOtherPurpose(e.target.value)}
+                    className="mt-3 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10 placeholder:text-gray-300"
+                    autoFocus
+                  />
+                )}
+              </div>
             </>
           )}
 
@@ -327,16 +491,19 @@ function BookingModal({ venue, onClose }) {
                     <span className="text-gray-500">Venue</span>
                     <span className="text-gray-900 font-medium">{venue?.name}</span>
                   </div>
+
                   {bookingType === "day" ? (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Check-in</span>
+                        <span className="text-gray-500">From</span>
                         <span className="text-gray-900">{formatDisplay(selected.start)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Check-out</span>
-                        <span className="text-gray-900">{formatDisplay(selected.end)}</span>
-                      </div>
+                      {selected.end && selected.end !== selected.start && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">To</span>
+                          <span className="text-gray-900">{formatDisplay(selected.end)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-500">Duration</span>
                         <span className="text-gray-900">{days} day{days !== 1 ? "s" : ""}</span>
@@ -349,11 +516,27 @@ function BookingModal({ venue, onClose }) {
                         <span className="text-gray-900">{formatDisplay(selected.start)}</span>
                       </div>
                       <div className="flex justify-between">
+                        <span className="text-gray-500">Time</span>
+                        <span className="text-gray-900">
+                          {TIME_SLOTS.find(t => t.value === startTime)?.label} – {TIME_SLOTS.find(t => t.value === endTime)?.label}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-gray-500">Duration</span>
-                        <span className="text-gray-900">{hours} hour{hours !== 1 ? "s" : ""}</span>
+                        <span className="text-gray-900">{hoursDiff} hour{hoursDiff !== 1 ? "s" : ""}</span>
                       </div>
                     </>
                   )}
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Guests</span>
+                    <span className="text-gray-900">{guests} {guests === 1 ? "person" : "people"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Purpose</span>
+                    <span className="text-gray-900 text-right max-w-[60%]">{effectivePurpose}</span>
+                  </div>
+
                   <hr className="border-gray-200" />
                   <div className="flex justify-between font-semibold">
                     <span className="text-gray-800">Total</span>
@@ -369,7 +552,7 @@ function BookingModal({ venue, onClose }) {
         </div>
 
         {/* Footer actions */}
-        <div className="px-6 pb-6 flex gap-3">
+        <div className="px-6 pb-6 pt-2 flex gap-3 shrink-0 border-t border-gray-50">
           {step === 2 && (
             <button
               onClick={() => setStep(1)}
@@ -379,18 +562,22 @@ function BookingModal({ venue, onClose }) {
             </button>
           )}
           <button
-            disabled={!canProceed || (bookingType === "hour" && !selected.start)}
+            disabled={!canProceed}
             onClick={() => {
               if (step === 1) setStep(2);
               else {
-                // dispatch booking thunk here
-                alert("Booking confirmed! (wire up your thunk here)");
+                const payload = buildPayload();
+                console.log("Booking payload:", payload);
+                // dispatch(createBooking(payload));  ← wire up your thunk here
+                alert("Booking confirmed!\n\n" + JSON.stringify(payload, null, 2));
                 onClose();
               }
             }}
             className="flex-1 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {step === 1 ? (canProceed && (selected.start) ? `Continue · ₹${totalPrice.toLocaleString()}` : "Select dates to continue") : "Confirm booking"}
+            {step === 1
+              ? (canProceed ? `Continue · ₹${totalPrice.toLocaleString()}` : "Complete all fields to continue")
+              : "Confirm booking"}
           </button>
         </div>
       </div>
@@ -450,10 +637,10 @@ export default function VenueDetail() {
       <Header />
 
       <main className="pt-[68px] min-h-screen bg-white">
-        {/* ── Hero placeholder image strip ── */}
+        {/* ── Hero image strip ── */}
         <div className="bg-gray-100 h-64 sm:h-80 flex items-center justify-center overflow-hidden">
           <div className="text-center text-gray-300">
-            <img src={venue.images} className="h-44 w-full object-cover" alt={venue.name}/>
+            <img src={venue.images} className="h-44 w-full object-cover" alt={venue.name} />
           </div>
         </div>
 
@@ -463,7 +650,6 @@ export default function VenueDetail() {
 
             {/* LEFT — details */}
             <div className="flex-1 min-w-0">
-              {/* Name + location */}
               <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 leading-tight">{name}</h1>
                 <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
@@ -475,7 +661,6 @@ export default function VenueDetail() {
                 </p>
               </div>
 
-              {/* Quick stats */}
               <div className="grid grid-cols-3 gap-3 mb-8">
                 {[
                   { icon: "👥", label: "Max capacity", value: `${max_capacity} people` },
@@ -490,13 +675,11 @@ export default function VenueDetail() {
                 ))}
               </div>
 
-              {/* Description */}
               <div className="mb-8">
                 <h2 className="text-base font-semibold text-gray-900 mb-2">About this venue</h2>
                 <p className="text-sm text-gray-600 leading-relaxed">{description || "No description provided."}</p>
               </div>
 
-              {/* Location detail */}
               <div className="mb-8">
                 <h2 className="text-base font-semibold text-gray-900 mb-3">Location</h2>
                 <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-1.5">
@@ -506,13 +689,10 @@ export default function VenueDetail() {
                 </div>
               </div>
 
-              {/* Policies */}
               <div>
                 <h2 className="text-base font-semibold text-gray-900 mb-3">Things to know</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-600">
                   {[
-                    ["Check-in from", "8:00 AM"],
-                    ["Check-out by", "10:00 PM"],
                     ["Cancellation", "48h notice required"],
                     ["Catering", "Self-arranged"],
                   ].map(([k, v]) => (
