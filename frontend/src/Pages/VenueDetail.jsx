@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { userVenueDetail } from "../Redux/Slice/venueSlice";
+import { createBooking } from "../Redux/Slice/bookingSlice";
 import Header from "../Components/Header";
 import Footer from "../Components/Footer";
 
@@ -69,6 +70,12 @@ function formatDisplay(key) {
 }
 function diffDays(a, b) {
   return Math.round((parseKey(b) - parseKey(a)) / 86400000) + 1;
+}
+
+// Combine a date key ("2025-06-13") and time ("09:00") into an ISO string
+// Go's time.Time can parse RFC3339: "2025-06-13T09:00:00Z"
+function toISO(dateKey, timeStr) {
+  return `${dateKey}T${timeStr}:00Z`;
 }
 
 // ─── Calendar ───────────────────────────────────────────────────────────────
@@ -193,6 +200,9 @@ function Calendar({ selected, dragStart, dragEnd, onMouseDown, onMouseEnter, onM
 // ─── Booking Modal ──────────────────────────────────────────────────────────
 
 function BookingModal({ venue, onClose }) {
+  const dispatch = useDispatch();
+  const { loading: bookingLoading, error: bookingError } = useSelector(s => s.booking);
+
   const [selected, setSelected] = useState({ start: null, end: null });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
@@ -266,28 +276,54 @@ function BookingModal({ venue, onClose }) {
     guests >= 1 &&
     effectivePurpose.trim() !== "";
 
-  // Build booking payload
+  // ── Build payload matching Go struct exactly ──────────────────────────────
+  //
+  // Go struct fields   ← JSON tags:
+  //   VenueId          ← "venue_id"           int
+  //   BookingType      ← "booking_type"        string  ("day" | "hour")
+  //   FromDate         ← "from_date"           time.Time  (RFC3339)
+  //   ToDate           ← "to_date"             time.Time  (RFC3339)
+  //   StartingTime     ← "start_time"          time.Time  (RFC3339)
+  //   EndingTime       ← "end_time"            time.Time  (RFC3339)
+  //   TotalGuests      ← "total_guests"        int
+  //   PurposeOfEvent   ← "purpose_of_event"    string
+  //
+  // For day bookings:  populate from_date & to_date; send start_time & end_time
+  //   as midnight of those dates (Go side can ignore them or use zero value).
+  // For hour bookings: from_date == to_date == selected date; start_time &
+  //   end_time carry the actual clock times.
+  // ─────────────────────────────────────────────────────────────────────────
   const buildPayload = () => {
-    const base = {
-      venue_id: venue?.id,
-      guests,
-      purpose: effectivePurpose,
-    };
     if (bookingType === "day") {
       return {
-        ...base,
+        venue_id: venue?.id,
         booking_type: "day",
-        start_date: selected.start,
-        end_date: selected.end,
+        from_date: toISO(selected.start, "00:00"),   // "2025-06-13T00:00:00Z"
+        to_date: toISO(selected.end, "00:00"),         // "2025-06-15T00:00:00Z"
+        start_time: toISO(selected.start, "00:00"),   // zero-value for day bookings
+        end_time: toISO(selected.end, "00:00"),
+        total_guests: guests,
+        purpose_of_event: effectivePurpose,
       };
     } else {
       return {
-        ...base,
+        venue_id: venue?.id,
         booking_type: "hour",
-        date: selected.start,
-        start_time: startTime,
-        end_time: endTime,
+        from_date: toISO(selected.start, "00:00"),
+        to_date: toISO(selected.start, "00:00"),       // same day for hourly
+        start_time: toISO(selected.start, startTime), // "2025-06-13T09:00:00Z"
+        end_time: toISO(selected.start, endTime),      // "2025-06-13T11:00:00Z"
+        total_guests: guests,
+        purpose_of_event: effectivePurpose,
       };
+    }
+  };
+
+  const handleConfirm = async () => {
+    const payload = buildPayload();
+    const result = await dispatch(createBooking(payload));
+    if (!result.error) {
+      onClose();
     }
   };
 
@@ -544,6 +580,14 @@ function BookingModal({ venue, onClose }) {
                   </div>
                 </div>
               </div>
+
+              {/* API error display */}
+              {bookingError && (
+                <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-xs text-red-600">
+                  {typeof bookingError === "string" ? bookingError : "Something went wrong. Please try again."}
+                </div>
+              )}
+
               <p className="text-xs text-gray-400">
                 By confirming, you agree to BookMyVenue's booking policy. The venue owner will review and confirm your request.
               </p>
@@ -562,22 +606,23 @@ function BookingModal({ venue, onClose }) {
             </button>
           )}
           <button
-            disabled={!canProceed}
+            disabled={!canProceed || bookingLoading}
             onClick={() => {
               if (step === 1) setStep(2);
-              else {
-                const payload = buildPayload();
-                console.log("Booking payload:", payload);
-                // dispatch(createBooking(payload));  ← wire up your thunk here
-                alert("Booking confirmed!\n\n" + JSON.stringify(payload, null, 2));
-                onClose();
-              }
+              else handleConfirm();
             }}
-            className="flex-1 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {step === 1
-              ? (canProceed ? `Continue · ₹${totalPrice.toLocaleString()}` : "Complete all fields to continue")
-              : "Confirm booking"}
+            {bookingLoading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Confirming…
+              </>
+            ) : step === 1 ? (
+              canProceed ? `Continue · ₹${totalPrice.toLocaleString()}` : "Complete all fields to continue"
+            ) : (
+              "Confirm booking"
+            )}
           </button>
         </div>
       </div>

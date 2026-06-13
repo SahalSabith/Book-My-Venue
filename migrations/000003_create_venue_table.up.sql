@@ -20,7 +20,7 @@ CREATE TABLE venues (
     updated_at TIMESTAMP DEFAULT NOW(),
 
     deleted_at TIMESTAMP DEFAULT NULL,
-    images TEXT[] DEFAULT '{}'
+    images TEXT[] DEFAULT '{}',
 
     CONSTRAINT fk_owner
         FOREIGN KEY(owner_id)

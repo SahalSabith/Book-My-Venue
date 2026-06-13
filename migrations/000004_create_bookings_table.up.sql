@@ -18,6 +18,7 @@ CREATE TABLE bookings (
     no_of_guests INTEGER NOT NULL,
 
     purpose_of_event VARCHAR(255) NOT NULL,
+    booking_type VARCHAR(255) NOT NULL,
 
     starting_time TIME,
     ending_time TIME,
@@ -25,6 +26,7 @@ CREATE TABLE bookings (
     status booking_status DEFAULT 'pending',
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP,
 
     FOREIGN KEY (venue_id)
         REFERENCES venues(id)

@@ -14,6 +14,7 @@ type application struct {
 	users *models.UserModel
 	venueOwners *models.VenueOwnerModel
 	venues *models.VenueModel
+	bookings *models.BookingModel
 
 	jwtSecureKey []byte
 
@@ -52,6 +53,7 @@ func main() {
 		users: &models.UserModel{DB: db},
 		venueOwners: &models.VenueOwnerModel{DB: db},
 		venues: &models.VenueModel{DB: db},
+		bookings: &models.BookingModel{DB: db},
 
 		jwtSecureKey: []byte(secretKey),
 		
@@ -84,6 +86,8 @@ func main() {
 	
 	mux.HandleFunc("/list-venues",app.listVenus)
 	mux.HandleFunc("/user-venue-details/{id}",app.getVeneDetail)
+
+	mux.HandleFunc("/create-booking",app.requiredAuthentication(app.createBooking))
 
 	// app.requiredAuthentication
 
