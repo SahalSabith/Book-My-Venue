@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { registerVenueOwner } from "../Redux/Slice/authSlice";
+import { registerVenueOwner,logout } from "../Redux/Slice/authSlice";
 import { jwtDecode } from "jwt-decode";
 
 // ─── Mode Switch ─────────────────────────────────────────────────────────────
@@ -225,10 +225,10 @@ export default function Header() {
                     <div className="absolute right-0 mt-3 w-56 bg-white border border-gray-100 rounded-xl shadow-lg p-2 animate-in fade-in slide-in-from-top-2 duration-150">
                       <p className="font-semibold px-3 py-2 text-sm text-gray-700">{userName}</p>
                       <hr className="my-1 border-gray-100" />
-                      <button className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors">My bookings</button>
+                      <button className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors" onClick={() => navigate("/bookings")}>My bookings</button>
                       <button className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-gray-50 transition-colors">Saved venues</button>
                       <hr className="my-1 border-gray-100" />
-                      <button className="w-full text-left px-3 py-2 text-sm rounded-lg text-red-500 hover:bg-red-50 transition-colors">
+                      <button className="w-full text-left px-3 py-2 text-sm rounded-lg text-red-500 hover:bg-red-50 transition-colors" onClick={() => dispatch(logout())}>
                         Sign out
                       </button>
                     </div>
@@ -280,9 +280,9 @@ export default function Header() {
                   </div>
                   <span className="text-sm font-medium">{userName}</span>
                 </div>
-                <button className="text-left text-sm text-gray-600 hover:text-gray-900">My bookings</button>
+                <button className="text-left text-sm text-gray-600 hover:text-gray-900" onClick={() => navigate("/bookings")}>My bookings</button>
                 <button className="text-left text-sm text-gray-600 hover:text-gray-900">Saved venues</button>
-                <button className="text-left text-sm text-red-500">Sign out</button>
+                <button className="text-left text-sm text-red-500" onClick={() => dispatch(logout())}>Sign out</button>
               </>
             ) : (
               <div className="flex gap-3">

@@ -73,7 +73,6 @@ function diffDays(a, b) {
 }
 
 // Combine a date key ("2025-06-13") and time ("09:00") into an ISO string
-// Go's time.Time can parse RFC3339: "2025-06-13T09:00:00Z"
 function toISO(dateKey, timeStr) {
   return `${dateKey}T${timeStr}:00Z`;
 }
@@ -201,7 +200,7 @@ function Calendar({ selected, dragStart, dragEnd, onMouseDown, onMouseEnter, onM
 
 function BookingModal({ venue, onClose }) {
   const dispatch = useDispatch();
-  const { loading: bookingLoading, error: bookingError } = useSelector(s => s.booking);
+  const { loading: bookingLoading, error: bookingError } = useSelector(state => state.bookings);
 
   const [selected, setSelected] = useState({ start: null, end: null });
   const [isDragging, setIsDragging] = useState(false);
@@ -260,7 +259,6 @@ function BookingModal({ venue, onClose }) {
     t => timeToMinutes(t.value) > timeToMinutes(startTime)
   );
 
-  // Fix endTime if it becomes invalid after startTime change
   const handleStartTimeChange = (val) => {
     setStartTime(val);
     if (timeToMinutes(endTime) <= timeToMinutes(val)) {
@@ -276,32 +274,14 @@ function BookingModal({ venue, onClose }) {
     guests >= 1 &&
     effectivePurpose.trim() !== "";
 
-  // ── Build payload matching Go struct exactly ──────────────────────────────
-  //
-  // Go struct fields   ← JSON tags:
-  //   VenueId          ← "venue_id"           int
-  //   BookingType      ← "booking_type"        string  ("day" | "hour")
-  //   FromDate         ← "from_date"           time.Time  (RFC3339)
-  //   ToDate           ← "to_date"             time.Time  (RFC3339)
-  //   StartingTime     ← "start_time"          time.Time  (RFC3339)
-  //   EndingTime       ← "end_time"            time.Time  (RFC3339)
-  //   TotalGuests      ← "total_guests"        int
-  //   PurposeOfEvent   ← "purpose_of_event"    string
-  //
-  // For day bookings:  populate from_date & to_date; send start_time & end_time
-  //   as midnight of those dates (Go side can ignore them or use zero value).
-  // For hour bookings: from_date == to_date == selected date; start_time &
-  //   end_time carry the actual clock times.
-  // ─────────────────────────────────────────────────────────────────────────
   const buildPayload = () => {
     if (bookingType === "day") {
       return {
         venue_id: venue?.id,
         booking_type: "day",
-        from_date: toISO(selected.start, "00:00"),   // "2025-06-13T00:00:00Z"
-        to_date: toISO(selected.end, "00:00"),         // "2025-06-15T00:00:00Z"
-        start_time: toISO(selected.start, "00:00"),   // zero-value for day bookings
-        end_time: toISO(selected.end, "00:00"),
+        from_date: toISO(selected.start, "00:00"),
+        to_date: toISO(selected.end, "00:00"),
+        // no start_time / end_time for day bookings
         total_guests: guests,
         purpose_of_event: effectivePurpose,
       };
@@ -311,8 +291,8 @@ function BookingModal({ venue, onClose }) {
         booking_type: "hour",
         from_date: toISO(selected.start, "00:00"),
         to_date: toISO(selected.start, "00:00"),       // same day for hourly
-        start_time: toISO(selected.start, startTime), // "2025-06-13T09:00:00Z"
-        end_time: toISO(selected.start, endTime),      // "2025-06-13T11:00:00Z"
+        start_time: toISO(selected.start, startTime),
+        end_time: toISO(selected.start, endTime),
         total_guests: guests,
         purpose_of_event: effectivePurpose,
       };
@@ -350,7 +330,10 @@ function BookingModal({ venue, onClose }) {
                 {["day", "hour"].map(t => (
                   <button
                     key={t}
-                    onClick={() => setBookingType(t)}
+                    onClick={() => {
+                      setBookingType(t);
+                      setSelected({ start: null, end: null });
+                    }}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${bookingType === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
                   >
                     {t === "day" ? "By the day" : "By the hour"}
@@ -358,8 +341,8 @@ function BookingModal({ venue, onClose }) {
                 ))}
               </div>
 
-              {/* ── Date picker ── */}
-              {bookingType === "day" ? (
+              {/* ── Day booking ── */}
+              {bookingType === "day" && (
                 <>
                   <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
                     <span className="inline-block w-4 h-4 bg-gray-200 rounded text-center leading-4 text-[10px]">⟺</span>
@@ -389,9 +372,12 @@ function BookingModal({ venue, onClose }) {
                     </div>
                   )}
                 </>
-              ) : (
+              )}
+
+              {/* ── Hour booking ── */}
+              {bookingType === "hour" && (
                 <div className="space-y-4">
-                  <p className="text-xs text-gray-400">Pick a date and set your time slot</p>
+                  <p className="text-xs text-gray-400">Pick a day and set your time slot</p>
                   <Calendar
                     selected={selected}
                     dragStart={null}
@@ -402,9 +388,15 @@ function BookingModal({ venue, onClose }) {
                     today={today}
                   />
 
-                  {/* Time slot picker */}
                   {selected.start && (
                     <div className="space-y-3">
+                      {/* Selected day display */}
+                      <div className="bg-gray-50 rounded-xl px-4 py-3">
+                        <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wide mb-0.5">Day</p>
+                        <p className="text-sm font-semibold text-gray-800">{formatDisplay(selected.start)}</p>
+                      </div>
+
+                      {/* Time slot picker */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-gray-500 block mb-1.5">Start time</label>
@@ -435,8 +427,7 @@ function BookingModal({ venue, onClose }) {
                       {hoursDiff > 0 && (
                         <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
                           <div className="text-xs text-gray-500">
-                            <div className="font-medium text-gray-800">{formatDisplay(selected.start)}</div>
-                            <div className="text-gray-400 mt-0.5">
+                            <div className="text-gray-400">
                               {TIME_SLOTS.find(t => t.value === startTime)?.label} → {TIME_SLOTS.find(t => t.value === endTime)?.label}
                             </div>
                           </div>
@@ -548,14 +539,16 @@ function BookingModal({ venue, onClose }) {
                   ) : (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Date</span>
+                        <span className="text-gray-500">Day</span>
                         <span className="text-gray-900">{formatDisplay(selected.start)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Time</span>
-                        <span className="text-gray-900">
-                          {TIME_SLOTS.find(t => t.value === startTime)?.label} – {TIME_SLOTS.find(t => t.value === endTime)?.label}
-                        </span>
+                        <span className="text-gray-500">Start time</span>
+                        <span className="text-gray-900">{TIME_SLOTS.find(t => t.value === startTime)?.label}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">End time</span>
+                        <span className="text-gray-900">{TIME_SLOTS.find(t => t.value === endTime)?.label}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Duration</span>
@@ -581,7 +574,6 @@ function BookingModal({ venue, onClose }) {
                 </div>
               </div>
 
-              {/* API error display */}
               {bookingError && (
                 <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-xs text-red-600">
                   {typeof bookingError === "string" ? bookingError : "Something went wrong. Please try again."}

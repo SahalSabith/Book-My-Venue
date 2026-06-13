@@ -9,6 +9,7 @@ import VenueOwner from "./Pages/VenueOwner";
 import MyVenues from "./Pages/MyVenues";
 import OwnerVenueDetail from "./Pages/OwnerVenueDetail";
 import VenueDetail from "./Pages/VenueDetail";
+import BookingsPage from "./Pages/Bookings";
 
 import ProtectedRoute from "./Components/ProtectedRoute";
 import PublicRoute from "./Components/PublicRoute";
@@ -31,6 +32,8 @@ const App = () => {
         <Route path="/venue-owner" element={<OwnerRoute><VenueOwner /></OwnerRoute>} />
         <Route path="/venue-owner/venues" element={<OwnerRoute><MyVenues /></OwnerRoute>} />
         <Route path="/venue-owner/venues/:id" element={<OwnerRoute><OwnerVenueDetail /></OwnerRoute>} />
+
+        <Route path="/bookings" element={<ProtectedRoute><BookingsPage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

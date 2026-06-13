@@ -340,7 +340,7 @@ func (app *application) listVenus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]any{
-		"message": "Venue deleted successfully",
+		"message": "Venues fetched Successfully",
 		"venues":venues,
 	}
 

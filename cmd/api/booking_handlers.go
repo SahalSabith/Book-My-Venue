@@ -120,3 +120,91 @@ func (app *application) createBooking(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
+
+
+func (app *application) getBookings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w,"Method not allowed",http.StatusMethodNotAllowed)
+		return
+	}
+
+	userId := r.Context().Value(userContextKey).(int)
+
+	type Booking struct {
+		ID int `json:"id"`
+		VenueId int `json:"venue_id"`
+		FromDate time.Time `json:"from_date"`
+		ToDate time.Time `json:"to_date"`
+		TotalGuests int `json:"no_of_guests"`
+		PurposeOfEvent string `json:"purpose_of_event"`
+		BookingType string `json:"booking_type"`
+		StartingTime time.Time `json:"starting_time"`
+		EndingTime time.Time `json:"ending_time"`
+		BookingStatus string `json:"booking_status"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+
+	stmt := `
+	SELECT
+	id,
+	venue_id,
+	from_date,
+	to_date,
+	no_of_guests,
+	purpose_of_event,
+	booking_type,
+	starting_time,
+	ending_time,
+	status,
+	created_at
+	FROM bookings 
+	WHERE user_id = $1
+	`
+
+	rows, err := app.bookings.DB.Query(stmt,userId)
+	if err != nil{
+		http.Error(w,err.Error(),http.StatusNotFound)
+		return
+	}
+
+	defer rows.Close()
+
+	bookings := []Booking{}
+	for rows.Next() {
+		var booking Booking
+
+		err := rows.Scan(
+			&booking.ID,
+			&booking.VenueId,
+			&booking.FromDate,
+			&booking.ToDate,
+			&booking.TotalGuests,
+			&booking.PurposeOfEvent,
+			&booking.BookingType,
+			&booking.StartingTime,
+			&booking.EndingTime,
+			&booking.BookingStatus,
+			&booking.CreatedAt,
+		)
+
+		if err != nil {
+			http.Error(w,err.Error(),http.StatusInternalServerError)
+			return
+		}
+
+		bookings = append(bookings, booking)
+	}
+
+	if err = rows.Err(); err != nil {
+		http.Error(w,err.Error(),http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]any{
+		"message": "Bookings Fetched successfully",
+		"bookings":bookings,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

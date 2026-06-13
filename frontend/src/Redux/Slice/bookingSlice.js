@@ -3,7 +3,7 @@ import axios from "axios";
 
 
 export const createBooking = createAsyncThunk(
-  "venue/createBooking",
+  "booking/createBooking",
   async (reqData, { rejectWithValue,getState }) => {
     try {
       const token = getState().auth.token;
@@ -22,10 +22,31 @@ export const createBooking = createAsyncThunk(
   }
 );
 
+export const listBookings = createAsyncThunk(
+  "booking/listBookings",
+  async (_, { rejectWithValue,getState }) => {
+    try {
+      const token = getState().auth.token;
+
+      const response = await axios.get(
+        "http://localhost:4000/list-bookings",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 
 const initialState = {
   loading: false,
-  error: null
+  error: null,
+  bookings:[]
 };
 
 const bookingSlice = createSlice({
@@ -41,10 +62,16 @@ const bookingSlice = createSlice({
         state.loading = false;
     })
 
+    .addCase(listBookings.fulfilled, (state, action) => {
+        state.loading = false;
+        state.bookings = action.payload.bookings
+    })
+
     // ALL PENDING REQUESTS
     .addMatcher(
     isPending(
-        createBooking
+        createBooking,
+        listBookings
     ),
     (state) => {
         state.loading = true;
@@ -55,7 +82,8 @@ const bookingSlice = createSlice({
     // ALL FAILED REQUESTS
     .addMatcher(
     isRejected(
-        createBooking
+        createBooking,
+        listBookings
     ),
     (state, action) => {
         state.loading = false;
