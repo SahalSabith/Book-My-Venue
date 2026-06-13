@@ -20,6 +20,7 @@ require (
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/lib/pq v1.12.3 // indirect
+	github.com/razorpay/razorpay-go v1.4.1 // indirect
 	github.com/redis/go-redis/v9 v9.20.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.67.0 // indirect

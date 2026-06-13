@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -61,6 +62,8 @@ func main() {
 		forgotCache: &models.ForgotPasswordCache{Redis: redisClient},
 	}
 
+	app.startBookingCleanupWorker()
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health",func(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +92,7 @@ func main() {
 
 	mux.HandleFunc("/create-booking",app.requiredAuthentication(app.createBooking))
 	mux.HandleFunc("/list-bookings",app.requiredAuthentication(app.getBookings))
+	mux.HandleFunc("/verify-payment",app.requiredAuthentication(app.verifyPayment))
 
 	// app.requiredAuthentication
 
@@ -96,4 +100,24 @@ func main() {
 
 	log.Println("You server running on port ",addr)
 	log.Fatal(http.ListenAndServe(addr,enableCORS(mux)))
+}
+
+
+func (app *application) startBookingCleanupWorker(){
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			rowsAffected, err := app.bookings.CleanupExpiredbookings()
+			if err != nil {
+				log.Println("cleanup worker failed", "error", err)
+				continue
+			}
+
+			if rowsAffected > 0 {
+				log.Println("cleaned up expired pending bookings", "count", rowsAffected)
+			}
+		}
+	}()
 }

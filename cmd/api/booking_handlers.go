@@ -1,12 +1,22 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log"
+	"math"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/razorpay/razorpay-go"
 )
 
 
@@ -27,6 +37,7 @@ func (app *application) createBooking(w http.ResponseWriter, r *http.Request) {
 		EndingTime time.Time `json:"end_time"`
 		TotalGuests int `json:"total_guests"`
 		PurposeOfEvent string `json:"purpose_of_event"`
+		BookingStatus string `json:"booking_status"`
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
@@ -37,6 +48,25 @@ func (app *application) createBooking(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&input)
 	if err != nil {
 		http.Error(w, "Invalid Json",http.StatusBadRequest)
+		return
+	}
+
+	if input.BookingType != "day" && input.BookingType != "hour" {
+		http.Error(w,"Invalid booking type",400)
+		return
+	}
+
+	if input.BookingType == "day" &&
+		input.ToDate.Before(input.FromDate) {
+
+		http.Error(w,"Invalid date range",400)
+		return
+	}
+
+	if input.BookingType == "hour" &&
+		input.EndingTime.Before(input.StartingTime) {
+
+		http.Error(w,"Invalid time range",400)
 		return
 	}
 
@@ -54,10 +84,11 @@ func (app *application) createBooking(w http.ResponseWriter, r *http.Request) {
 	
 	if err != nil {
 		http.Error(w,err.Error(),http.StatusInternalServerError)
+		return
 	}
 
 	if !success {
-		errors.New("venue booking already processing")
+		http.Error(w,"Venue booking already processing",http.StatusConflict,)
 		return
 	}
 
@@ -105,7 +136,61 @@ func (app *application) createBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bookingId,err := app.bookings.Insert(input.VenueId,userId,input.TotalGuests,input.FromDate,input.ToDate,input.StartingTime,input.EndingTime,input.BookingType,input.PurposeOfEvent)
+	var pricePerHour int64
+	var pricePerDay int64
+
+	err = app.bookings.DB.QueryRow(`
+	SELECT 
+		price_per_hour,
+		price_per_day
+	FROM venues
+	WHERE id = $1
+	`,input.VenueId).Scan(&pricePerHour,&pricePerDay)
+
+	if err != nil {
+		http.Error(w, "Venue not found", http.StatusNotFound)
+		return
+	}
+
+	var totalAmount int64
+
+	if input.BookingType == "day" {
+		days := int64(input.ToDate.Sub(input.FromDate).Hours()/24) + 1
+		totalAmount = days * pricePerDay
+	}
+
+	if input.BookingType == "hour" {
+		duration := input.EndingTime.Sub(input.StartingTime)
+		hours := int64(math.Ceil(duration.Hours()))
+		totalAmount = hours * pricePerHour
+	}
+
+	amountInPaisa := totalAmount * 100
+
+	err = godotenv.Load()
+
+	if err != nil {
+		log.Fatal("Error loading .env")
+	}
+
+	client := razorpay.NewClient(os.Getenv("RAZORPAY_KEY"),os.Getenv("RAZORPAY_KEY_SECRET"))
+
+	data := map[string]interface{}{
+		"amount":amountInPaisa,
+		"currency":"INR",
+		"receipt":"receipt_order_12345",
+		"payment_capture":1,
+	}
+
+	order, err := client.Order.Create(data, nil)
+    if err != nil {
+        http.Error(w, "Payment gateway initialization failed", http.StatusInternalServerError)
+        return
+    }
+
+    razorpayOrderID := order["id"].(string)
+
+	bookingId,err := app.bookings.Insert(input.VenueId,userId,input.TotalGuests,input.FromDate,input.ToDate,input.StartingTime,input.EndingTime,input.BookingType,input.PurposeOfEvent,totalAmount)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -114,6 +199,8 @@ func (app *application) createBooking(w http.ResponseWriter, r *http.Request) {
 	response := map[string]any{
 		"message":"Venue Booked Succesfully",
 		"id":bookingId,
+		"razorpay_order_id":razorpayOrderID,
+		"amount":strconv.Itoa(int(amountInPaisa)),
 	}
 
 	w.Header().Set("Content-Type","application/json")
@@ -203,6 +290,73 @@ func (app *application) getBookings(w http.ResponseWriter, r *http.Request) {
 	response := map[string]any{
 		"message": "Bookings Fetched successfully",
 		"bookings":bookings,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+type VerificationPayload struct {
+	RazorpayOrderID   string `json:"razorpay_order_id"`
+	RazorpayPaymentID string `json:"razorpay_payment_id"`
+	RazorpaySignature string `json:"razorpay_signature"`
+	BookingId int `json:"booking_id"`
+}
+
+func (app *application) verifyPayment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost{
+		http.Error(w,"Method not allowed",http.StatusMethodNotAllowed)
+		return
+	}
+
+	var input VerificationPayload
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	err := decoder.Decode(&input)
+	if err != nil {
+		http.Error(w, "Invalid Json",http.StatusBadRequest)
+		return
+	}
+
+	err = godotenv.Load()
+
+	if err != nil {
+		log.Fatal("Error loading .env")
+	}
+
+	secret := os.Getenv("RAZORPAY_KEY_SECRET")
+
+	data := input.RazorpayOrderID + "|" + input.RazorpayPaymentID
+
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(data))
+	expectedSignature := hex.EncodeToString(h.Sum(nil))
+
+	signatureIsValid := subtle.ConstantTimeCompare([]byte(expectedSignature), []byte(input.RazorpaySignature)) == 1
+
+	if !signatureIsValid {
+		http.Error(w, "Invalid transaction signature. Fraud detected.", http.StatusBadRequest)
+		return
+	}
+
+	stmt := `
+		UPDATE bookings 
+		SET status = 'confirmed' 
+		WHERE id = $1 AND status='pending' AND expires_at > NOW()
+	`
+	_, err = app.bookings.DB.ExecContext(r.Context(), stmt, input.BookingId)
+
+	if err != nil {
+		http.Error(w,err.Error(),http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]any{
+		"message": "Booking finalized safely",
 	}
 
 	w.Header().Set("Content-Type", "application/json")

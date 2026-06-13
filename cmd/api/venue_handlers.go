@@ -494,7 +494,6 @@ func (app *application) venueImageUpload(w http.ResponseWriter, r *http.Request)
 			continue // If one image upload fails to Cloudinary, keep processing the next ones
 		}
 
-		// 4. Append this specific URL directly into the PostgreSQL array column
 		stmt := `
 			UPDATE venues 
 			SET images = array_append(images, $1) 

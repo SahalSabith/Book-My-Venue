@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { userVenueDetail } from "../Redux/Slice/venueSlice";
-import { createBooking } from "../Redux/Slice/bookingSlice";
+import { createBooking,clearCurrentOrder,verifyPayment } from "../Redux/Slice/bookingSlice";
 import Header from "../Components/Header";
 import Footer from "../Components/Footer";
 
@@ -302,9 +302,48 @@ function BookingModal({ venue, onClose }) {
   const handleConfirm = async () => {
     const payload = buildPayload();
     const result = await dispatch(createBooking(payload));
-    if (!result.error) {
-      onClose();
-    }
+
+    if (result.error) return;
+
+    const { razorpay_order_id, amount, id: booking_id } = result.payload;
+
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: String(amount),
+      currency: "INR",
+      name: "BookMyVenue",
+      description: `Booking: ${venue?.name}`,
+      order_id: razorpay_order_id,
+      handler: async (response) => {
+        const verifyResult = await dispatch(
+          verifyPayment({
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id:   response.razorpay_order_id,
+            razorpay_signature:  response.razorpay_signature,
+            booking_id,
+          })
+        );
+        if (!verifyResult.error) {
+          dispatch(clearCurrentOrder());
+          onClose();
+        }
+      },
+      prefill: {
+        // optional — pre-fill if you have user data
+        // name: user?.name,
+        // email: user?.email,
+      },
+      theme: { color: "#111827" },
+      modal: {
+        ondismiss: () => {
+          // user closed Razorpay without paying — keep modal open
+          dispatch(clearCurrentOrder());
+        },
+      },
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
   };
 
   return (

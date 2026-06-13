@@ -22,6 +22,7 @@ CREATE TABLE bookings (
 
     starting_time TIME,
     ending_time TIME,
+    total_amount BIGINT NOT NULL DEFAULT 0,
 
     status booking_status DEFAULT 'pending',
 

@@ -1,0 +1,2 @@
+ALTER TABLE bookings
+ADD COLUMN total_amount BIGINT NOT NULL DEFAULT 0;
